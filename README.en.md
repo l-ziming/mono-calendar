@@ -8,7 +8,7 @@
 [![Home Assistant App](https://img.shields.io/badge/Home_Assistant-App-18BCF2?style=flat&logo=homeassistant&logoColor=white)](ha-app/DOCS.md)
 [![Sony DPT-RP1](https://img.shields.io/badge/Sony-DPT--RP1-24292F?style=flat)](docs/hardware.md)
 
-This is a little project I work on in my spare time. I wanted a screen next to me for things like the weather, and I happened to have a Sony DPT-RP1 sitting around collecting dust, so I put it to use. Thanks to [HappyZ/dpt-tools](https://github.com/HappyZ/dpt-tools). I'm very much standing on the shoulders of giants here.
+This is a little project I work on in my spare time. I wanted a screen next to me for things like the weather, and I happened to have a Sony DPT-RP1 sitting around collecting dust, so I put it to use.
 
 There are two parts: Home Assistant and the RP1. Home Assistant collects room and environment data, controls devices, and calls an LLM API to write short notes. The Android app on the RP1 draws the page and handles simple interactions.
 
@@ -60,11 +60,26 @@ I'm also working on the RP1's system software. There isn't a ready-to-install re
 1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. The [system changes](docs/rp1-tuning.md) (Chinese) have cut the observed wake-up rate by more than half.
 2. **Occasional hangs after standby**: the Wi-Fi driver can time out while checking the wake reason, leaving the screen stuck until I press RESET. I'm testing a fix for the driver's timeout and wait handling.
 
+## Acknowledgments
+
+Thanks to the authors and maintainers of these projects:
+
+- [HappyZ/dpt-tools](https://github.com/HappyZ/dpt-tools): RP1 tools and documentation.
+- [Home Assistant](https://github.com/home-assistant/core) and [Node.js](https://github.com/nodejs/node): home device integration and the server runtime.
+- [chinese_calendar](ha-app/server/vendor/CHINESE_CALENDAR.md): Chinese calendar dates, solar terms and almanac data, from [6tail/lunar-javascript](https://github.com/6tail/lunar-javascript), with its [MIT license](ha-app/server/vendor/LICENSE.chinese_calendar) preserved.
+- [streaming-markdown](https://github.com/thetarnav/streaming-markdown): streaming Markdown rendering in the web chat, with its [MIT license](ha-app/server/vendor/LICENSE.streaming-markdown) preserved.
+- [Noto CJK](https://github.com/notofonts/noto-cjk), [Noto Serif](https://github.com/notofonts/noto-fonts) and [Google Fonts](https://github.com/google/fonts): Chinese interface fonts and the opening quotation mark glyph.
+- [Inter](https://github.com/rsms/inter): Latin text and numerals in the interface.
+- [fontTools](https://github.com/fonttools/fonttools): font subsetting, static instances and tabular numeral processing.
+- [Shields.io](https://github.com/badges/shields): README badges.
+
+Font sources, modifications and licenses are listed in the [font notes](android/assets/fonts/README.md).
+
 ## License
 
 I publish the source so people tinkering with the RP1 or other e-ink devices can modify it and use it themselves. I don't want it to become a preinstalled feature, a selling point or a "free gift" for device resellers, so I've kept the noncommercial restrictions. This is a source-available project; these noncommercial licenses do not meet the [OSI Open Source Definition](https://opensource.org/osd).
 
 - **Code**: [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in [NOTICE](NOTICE).
-- **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by liziming" in their interface.
+- **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by l-ziming" in their interface.
 - **Commercial use**: Contact the author through this repository's GitHub Issues for separate written permission before using this project commercially, such as selling devices with it preinstalled, bundling it as a "free" addition to a device sale, or offering installation, customization or hosting as a for-profit service. Not charging separately for the software does not make the use noncommercial; the applicable license texts govern.
-- **Third-party components** keep their own licenses: Chinese calendar dates, solar terms and almanac data use the vendored [chinese_calendar](ha-app/server/vendor/chinese_calendar.mjs), with its [source notes](ha-app/server/vendor/CHINESE_CALENDAR.md) and [MIT license](ha-app/server/vendor/LICENSE.chinese_calendar); Markdown rendering uses [streaming-markdown](ha-app/server/vendor/STREAMING_MARKDOWN.md), under its [MIT license](ha-app/server/vendor/LICENSE.streaming-markdown); font licenses are in [android/assets/fonts/](android/assets/fonts/).
+- **Third-party components** keep their own licenses; see [Acknowledgments](#acknowledgments).

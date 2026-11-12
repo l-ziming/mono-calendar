@@ -1,6 +1,6 @@
 # 刻历视觉设计许可 / Visual Design License
 
-Copyright (c) 2026 liziming
+Copyright (c) 2026 l-ziming
 
 ## 范围 / Scope
 
@@ -16,11 +16,11 @@ The visual design of the 刻历 page (layout, typography, information hierarchy 
 
 按 CC BY-NC 4.0 第 3(a)(1)(A) 条，作者要求以下列方式署名：凡使用或改编本设计的作品，在其界面上（例如页面角落、设置页或"关于"页）显示：
 
-> 设计基于 刻历 by liziming（CC BY-NC 4.0）
+> 设计基于 刻历 by l-ziming（CC BY-NC 4.0）
 
 并注明是否作了修改。
 
-Per Section 3(a)(1)(A), the Licensor requests that any work using or adapting this design show, in its user interface (for example a page corner, settings or "About" screen): "Design based on 刻历 by liziming (CC BY-NC 4.0)", and indicate whether changes were made.
+Per Section 3(a)(1)(A), the Licensor requests that any work using or adapting this design show, in its user interface (for example a page corner, settings or "About" screen): "Design based on 刻历 by l-ziming (CC BY-NC 4.0)", and indicate whether changes were made.
 
 ## 商业使用 / Commercial use
 
