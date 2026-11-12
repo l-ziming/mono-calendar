@@ -8,7 +8,7 @@
 
 ![屏幕样例](docs/images/sample.png)
 
-样例由 `Page.java` 在桌面绘制。当前版本：HA App 0.10.0（experimental）。这是按我自己的 RP1 与 Home Assistant 环境开发和验证的个人项目，复现需要 root 过的 RP1。
+样例由 `Page.java` 在桌面绘制。当前版本：HA App 0.10.1（experimental）。这是按我自己的 RP1 与 Home Assistant 环境开发和验证的个人项目，复现需要 root 过的 RP1。
 
 ## 组成
 
