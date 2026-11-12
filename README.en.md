@@ -62,7 +62,7 @@ I'm also working on the RP1's system software. There isn't a ready-to-install re
 
 ## License
 
-I publish the source so other RP1 tinkerers can learn from it, modify it, use it themselves and share improvements. I don't want it to become a preinstalled feature, sales pitch or "free gift" for device resellers, so I've kept a noncommercial restriction. This is a source-available project; these noncommercial licenses do not meet the [OSI Open Source Definition](https://opensource.org/osd).
+I publish the source so people tinkering with the RP1 or other e-ink devices can modify it and use it themselves. I don't want it to become a preinstalled feature, a selling point or a "free gift" for device resellers, so I've kept the noncommercial restrictions. This is a source-available project; these noncommercial licenses do not meet the [OSI Open Source Definition](https://opensource.org/osd).
 
 - **Code**: [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in [NOTICE](NOTICE).
 - **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by liziming" in their interface.

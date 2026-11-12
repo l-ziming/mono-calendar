@@ -60,7 +60,7 @@ GitHub Actions 会在提交和 PR 时自动运行测试；在 Actions 页手动�
 
 ## 许可
 
-我公开源码，是希望同样在折腾 RP1 的人能学习、修改、自用，也能把改进分享回来。我不希望它成为倒卖设备的预装功能、捆绑卖点或“免费赠品”，因此保留了商业使用限制。本项目属于源码公开（source-available），所用非商业许可不符合 [OSI 的开源定义](https://opensource.org/osd)。
+我公开源码是希望同样在折腾 RP1 或者墨水屏的人能修改、自用。而不是倒卖设备的预装功能、捆绑卖点或“免费赠品”，因此保留了商业使用限制。本项目属于源码公开（source-available），所用非商业许可不符合 [OSI 的开源定义](https://opensource.org/osd)。
 
 - **代码**：[PolyForm Noncommercial 1.0.0](LICENSE)。个人、学习、研究和非营利用途可以自由使用、修改和分发，需保留 [NOTICE](NOTICE) 中的 `Required Notice`。
 - **视觉设计、图标与样例图**：[CC BY-NC 4.0](LICENSE-DESIGN.md)。使用或改编本设计的作品须在界面上署名「设计基于 刻历 by liziming」。
