@@ -2,7 +2,11 @@
 
 中文 | [English](README.en.md)
 
-[![检查](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
+[![检查](https://img.shields.io/github/actions/workflow/status/l-ziming/mono-calendar/check.yml?branch=main&event=push&style=flat&label=checks&logo=githubactions&logoColor=white)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
+[![代码：PolyForm Noncommercial](https://img.shields.io/badge/code-PolyForm_Noncommercial-9A6700?style=flat)](LICENSE)
+[![设计：CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](LICENSE-DESIGN.md)
+[![Home Assistant App](https://img.shields.io/badge/Home_Assistant-App-18BCF2?style=flat&logo=homeassistant&logoColor=white)](ha-app/DOCS.md)
+[![Sony DPT-RP1](https://img.shields.io/badge/Sony-DPT--RP1-24292F?style=flat)](docs/hardware.md)
 
 这是我闲暇时间做的一个小玩意。一直希望能有一个放在旁边的屏幕来提示一些基本信息，例如天气什么的；刚好手头也有一个索尼的电子纸，DPT-RP1，一直吃灰所以用起来了。在这里感谢[HappyZ/dpt-tools](https://github.com/HappyZ/dpt-tools), 属实是站在巨人的肩膀上了。
 
@@ -56,7 +60,9 @@ GitHub Actions 会在提交和 PR 时自动运行测试；在 Actions 页手动�
 
 ## 许可
 
+我公开源码，是希望同样在折腾 RP1 的人能学习、修改、自用，也能把改进分享回来。我不希望它成为倒卖设备的预装功能、捆绑卖点或“免费赠品”，因此保留了商业使用限制。本项目属于源码公开（source-available），所用非商业许可不符合 [OSI 的开源定义](https://opensource.org/osd)。
+
 - **代码**：[PolyForm Noncommercial 1.0.0](LICENSE)。个人、学习、研究和非营利用途可以自由使用、修改和分发，需保留 [NOTICE](NOTICE) 中的 `Required Notice`。
 - **视觉设计、图标与样例图**：[CC BY-NC 4.0](LICENSE-DESIGN.md)。使用或改编本设计的作品须在界面上署名「设计基于 刻历 by liziming」。
-- **商业使用**（销售预装设备、付费应用、商业服务等）：需事先联系作者获得单独授权，请在本仓库的 GitHub Issues 中联系。
+- **商业使用**：将本项目用于设备预装销售、随设备销售附赠或捆绑、营利性代装、定制或托管等商业用途前，需通过本仓库的 GitHub Issues 联系作者，取得单独书面授权。软件不单独收费，不等于用途属于非商业；具体授权范围以各许可证为准。
 - **第三方组件**保留各自许可：农历、节气和宜忌数据以仓库内的 [chinese_calendar](ha-app/server/vendor/chinese_calendar.mjs) 为准，[来源说明](ha-app/server/vendor/CHINESE_CALENDAR.md)和 [MIT 许可](ha-app/server/vendor/LICENSE.chinese_calendar)均保留；Markdown 渲染使用 [streaming-markdown](ha-app/server/vendor/STREAMING_MARKDOWN.md)，见其 [MIT 许可](ha-app/server/vendor/LICENSE.streaming-markdown)；字体许可见 [android/assets/fonts/](android/assets/fonts/)。

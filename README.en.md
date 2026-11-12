@@ -2,7 +2,11 @@
 
 [中文](README.md) | English
 
-[![Checks](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
+[![Checks](https://img.shields.io/github/actions/workflow/status/l-ziming/mono-calendar/check.yml?branch=main&event=push&style=flat&label=checks&logo=githubactions&logoColor=white)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
+[![Code: PolyForm Noncommercial](https://img.shields.io/badge/code-PolyForm_Noncommercial-9A6700?style=flat)](LICENSE)
+[![Design: CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](LICENSE-DESIGN.md)
+[![Home Assistant App](https://img.shields.io/badge/Home_Assistant-App-18BCF2?style=flat&logo=homeassistant&logoColor=white)](ha-app/DOCS.md)
+[![Sony DPT-RP1](https://img.shields.io/badge/Sony-DPT--RP1-24292F?style=flat)](docs/hardware.md)
 
 This is a little project I work on in my spare time. I wanted a screen next to me for things like the weather, and I happened to have a Sony DPT-RP1 sitting around collecting dust, so I put it to use. Thanks to [HappyZ/dpt-tools](https://github.com/HappyZ/dpt-tools). I'm very much standing on the shoulders of giants here.
 
@@ -58,7 +62,9 @@ I'm also working on the RP1's system software. There isn't a ready-to-install re
 
 ## License
 
+I publish the source so other RP1 tinkerers can learn from it, modify it, use it themselves and share improvements. I don't want it to become a preinstalled feature, sales pitch or "free gift" for device resellers, so I've kept a noncommercial restriction. This is a source-available project; these noncommercial licenses do not meet the [OSI Open Source Definition](https://opensource.org/osd).
+
 - **Code**: [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in [NOTICE](NOTICE).
 - **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by liziming" in their interface.
-- **Commercial use** (selling preinstalled devices, paid apps, commercial services, etc.) requires a separate license from the author; please get in touch through this repository's GitHub Issues.
+- **Commercial use**: Contact the author through this repository's GitHub Issues for separate written permission before using this project commercially, such as selling devices with it preinstalled, bundling it as a "free" addition to a device sale, or offering installation, customization or hosting as a for-profit service. Not charging separately for the software does not make the use noncommercial; the applicable license texts govern.
 - **Third-party components** keep their own licenses: Chinese calendar dates, solar terms and almanac data use the vendored [chinese_calendar](ha-app/server/vendor/chinese_calendar.mjs), with its [source notes](ha-app/server/vendor/CHINESE_CALENDAR.md) and [MIT license](ha-app/server/vendor/LICENSE.chinese_calendar); Markdown rendering uses [streaming-markdown](ha-app/server/vendor/STREAMING_MARKDOWN.md), under its [MIT license](ha-app/server/vendor/LICENSE.streaming-markdown); font licenses are in [android/assets/fonts/](android/assets/fonts/).
