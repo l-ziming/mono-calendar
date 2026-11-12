@@ -1,0 +1,38 @@
+{%- set raw = text | default('', true) -%}
+{%- set source = namespace(origin='') -%}
+{%- for link in raw | regex_findall('(?i)https?://[^\\s<>"\\x27]+') -%}
+  {%- if not source.origin -%}
+    {%- set origins = link | regex_findall('(?i)^(https?://(?:[a-z0-9-]+\\.)*(?:nytimes\\.com|newyorktimes\\.com))(?=[/?#]|$)') -%}
+    {%- if origins -%}{%- set source.origin = origins[0] -%}{%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- if raw | regex_search('(?i)<(?:!doctype|html|head|body|table|div|p|a)\\b') -%}
+  {%- set cleaned = raw
+      | regex_replace('(?is)<!--\\s*(?:(?:begin|start)\\s+(?:ad|advertisement|sponsored content|paid post)|(?:ad|advertisement|sponsored content|paid post)(?:\\s+(?:begin|start))?)\\s*-->.*?<!--\\s*(?:(?:end|/)\\s*(?:ad|advertisement|sponsored content|paid post)|(?:ad|advertisement|sponsored content|paid post)\\s+end)\\s*-->', '\n')
+      | regex_replace('(?is)<!--.*?-->|<(head|style|script)\\b[^>]*>.*?</\\1\\s*>', '')
+      | regex_replace('(?is)<[a-z][\\w:-]*\\b[^>]*\\sdata-(?:ad|ad-slot|ad-unit|advertisement|sponsored)(?=\\s|=|/?>)[^>]*>', '\nADVERTISEMENT\n')
+      | regex_replace('(?is)<[a-z][\\w:-]*\\b[^>]*\\s(?:class|id)\\s*=\\s*["\\x27](?:[^"\\x27]*\\s)?(?:ad-container|advertisement|sponsored-content|paid-post)(?:\\s[^"\\x27]*)?["\\x27][^>]*>', '\nADVERTISEMENT\n')
+      | regex_replace('(?i)<br\\s*/?>|</?(?:p|div|li|tr|h[1-6]|blockquote)\\b[^>]*>', '\n') -%}
+  {%- set cleaned = cleaned.split('\n') | map('striptags') | join('\n') -%}
+{%- else -%}
+  {%- set cleaned = raw -%}
+{%- endif -%}
+{%- set cleaned = cleaned
+    | regex_replace('(?i)https?://[^\\s<>"\\x27]+|\\bwww\\.[^\\s<>"\\x27]+', '')
+    | regex_replace('[\\t ]+', ' ') | regex_replace('\n\\s*\n+', '\n\n') | trim -%}
+{%- set filtered = namespace(lines=[], advertising=false) -%}
+{%- for line in cleaned.split('\n') -%}
+  {%- if line | regex_match('(?i)^\\s*(?:advertisement|paid post|sponsored(?: content| post)?|a message from .+|supported by .+)(?:\\s*[:—–-]\\s*.*)?\\s*$') -%}
+    {%- set filtered.advertising = true -%}
+  {%- elif filtered.advertising and line | regex_match('(?i)^\\s*(?:continue reading the main story|end (?:of )?(?:advertisement|ad|sponsored content|paid post)|back to (?:the )?(?:news|newsletter|story))\\.?\\s*$') -%}
+    {%- set filtered.advertising = false -%}
+  {%- elif not filtered.advertising or line | regex_match('(?i)^\\s*(?:the latest news|more news|today[’\x27]s headlines|around the world)\\s*$') -%}
+    {%- set filtered.advertising = false -%}
+    {%- if not line | regex_match('(?i)^\\s*(?:subscribe(?: now| to the new york times)?|start your subscription|get unlimited access|upgrade your subscription|support independent journalism|sign up for (?:this|our|the .+) newsletter)[.!]?\\s*$') -%}
+      {%- set filtered.lines = filtered.lines + [line] -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- set cleaned = filtered.lines | join('\n') | trim -%}
+{%- set cleaned = (source.origin ~ '/\n' if source.origin else '') ~ cleaned -%}
+{{- cleaned[:6000] -}}

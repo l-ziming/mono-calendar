@@ -1,0 +1,85 @@
+configuration:
+  display_token:
+    name: 屏幕令牌
+    description: 屏幕端访问数据与控制接口使用的独立令牌，至少 24 个字符，需与屏幕端填写的一致。与 HA 凭据无关。
+  timezone:
+    name: 时区
+    description: IANA 时区名，例如 Asia/Shanghai。决定日期、日程、屏幕检查时刻与静默时段。
+  temperature_unit:
+    name: 温度单位
+    description: 当 HA 实体没有标注温度单位时按此单位解读；屏幕统一显示摄氏度。
+  city:
+    name: 城市
+    description: 天气标题显示的城市名，也用于本地新闻；留空使用 HA 中设置的位置名称。
+  week_start:
+    name: 每周起始日
+    description: 0 为周日，1 为周一。
+  aqi_standard:
+    name: AQI 显示标准
+    description: 目前仅支持美国 EPA 2024 标准。
+  aqi_input_standard:
+    name: 室外 AQI 来源标准
+    description: 室外 AQI 实体所用的标准：US、CN2012 或 CN2026。中国标准的数值会按原始浓度换算为美国标准，不直接沿用。
+  aqi_cn_period:
+    name: 中国 AQI 浓度时段
+    description: 来源为中国标准时填写该指数对应的浓度时段，目前仅 24h 可换算；不确定时留空。
+  calendars:
+    name: 日历实体
+    description: 可选，HA 日历实体 ID，例如 calendar.home。也可以在网页「助手设置」中修改。
+  entities:
+    name: 实体映射
+    description: 屏幕各区域对应的 HA 实体。传感器支持 entity_id#attribute 读取属性；未使用的留空。
+  llm_api_key:
+    name: LLM API Key
+    description: 留空关闭模型生成。保存在 HA 应用配置中，修改后重启应用生效。
+  llm_model:
+    name: LLM 模型
+    description: 默认 deepseek-flash，可填写 API 支持的模型 ID。修改后重启应用生效。
+  llm_thinking:
+    name: Thinking 思考模式
+    description: 默认开启，聊天、记忆整理和屏幕便条共用。修改后重启应用生效。
+  llm_reasoning_effort:
+    name: 推理强度
+    description: low、high 或 max，默认 high；关闭 Thinking 时不发送此参数。修改后重启应用生效。
+  llm_max_tokens:
+    name: 单次生成 token 上限
+    description: 0 表示不额外指定，采用 API 默认额度；1～393216 设置包含思考与回答的总生成上限，仍受模型上下文限制。修改后重启应用生效。
+  llm_base_url:
+    name: LLM API 地址
+    description: 默认 https://api.deepseek.com，也支持带 /v1 的 HTTPS 兼容根地址。修改后重启应用生效。
+  assistant_entities:
+    name: 助理额外关注的实体
+    description: 可选，最多 24 个 HA 实体 ID，例如加湿器、灯、环境传感器。仅供助理读取，不增加设备控制。
+  assistant_presence_entities:
+    name: 在家状态参考实体
+    description: 可选，最多 8 个 person、device_tracker 或 binary_sensor 实体 ID。仅向模型提供辅助线索，保留未知和离线状态，不凭单个设备断言在家或离家。修改后重启应用生效。
+  assistant_news_mode:
+    name: 屏幕新闻模式
+    description: off 不在屏幕播新闻；morning 每天 06:00 至中午前择要采用一次早报；morning_and_major 另允许重大新进展。只控制屏幕表达，聊天仍可读取新闻。保存后下次检查生效。
+  assistant_news_interval_hours:
+    name: 重大消息更新间隔（小时）
+    description: 屏幕两次实际采用重大消息的最短间隔，1～168 小时，默认 6；不限制聊天读取新闻。保存后下次检查生效。
+  assistant_screen_times:
+    name: 屏幕固定检查时刻
+    description: 按应用配置时区填写多个 HH:MM（24 小时制）时刻，最多 24 个；到点请求模型决定保持、更新或清空。空列表关闭自动检查，手动刷新仍可用。保存后下次检查生效。
+  assistant_screen_min_minutes:
+    name: 屏幕最短停留时间（分钟）
+    description: 两次实际修改屏幕之间的最短间隔，0～1440 分钟，默认 15。保存后下次检查生效。
+  assistant_screen_max_per_hour:
+    name: 屏幕每小时更新上限
+    description: 任意连续一小时内实际修改屏幕的次数上限，1～60，默认 4。保持屏幕不计次数。保存后下次检查生效。
+  assistant_screen_quiet_start:
+    name: 屏幕静默开始时刻
+    description: 按应用配置时区填写 HH:MM，默认 23:00。静默期间不主动修改屏幕；开始和结束相同表示关闭静默。保存后下次检查生效。
+  assistant_screen_quiet_end:
+    name: 屏幕静默结束时刻
+    description: 按应用配置时区填写 HH:MM，默认 06:00，支持跨午夜。保存后下次检查生效。
+  assistant_context_tokens:
+    name: 上下文 token 预算
+    description: 使用 UTF-8 字节数保守估算输入 token，非模型 tokenizer 精确计数；16384～131072，默认 32768。为当前资料与输出预留空间，近期问答保留完整轮次。保存后下次请求生效。
+  assistant_memory_ttl_days:
+    name: 短期记忆默认保留天数
+    description: 用户未指定到期时间时使用的默认期限，1～365 天，默认 14。过期条目退出当前记忆，历史版本仍可恢复。保存后下次请求生效。
+  assistant_prompt:
+    name: 提示词
+    description: 完整提示词。保存后下次生成生效，无需重启；长文本可通过右上角菜单在 YAML 中编辑。留空使用独立提示词文件，文件不可用时使用内置默认。

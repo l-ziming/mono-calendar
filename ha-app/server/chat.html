@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>刻历</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #fafafa;
+        --white: #ffffff;
+        --ink: #35383d;
+        --muted: #697078;
+        --line: #e1e4e8;
+        --green: #3c6873;
+        --tint: #eef0f2;
+        --serif: 'Songti SC', 'Noto Serif CJK SC', serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font:
+          14px/1.7 -apple-system,
+          BlinkMacSystemFont,
+          'PingFang SC',
+          sans-serif;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--white);
+        padding: 9px 14px;
+      }
+      button:hover {
+        background: var(--tint);
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 210px minmax(340px, 1fr) 290px;
+        min-height: 100dvh;
+      }
+      .rail {
+        background: #eef0f2;
+        padding: 32px 22px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font: 25px var(--serif);
+        letter-spacing: 3px;
+      }
+      .logo {
+        width: 1.4em;
+        height: 1.4em;
+        flex: none;
+        border-radius: 22%;
+        box-shadow: 0 0 0 1px var(--line);
+      }
+      .rail nav {
+        display: grid;
+        gap: 8px;
+      }
+      .rail nav button {
+        text-align: left;
+        border-color: transparent;
+        background: transparent;
+      }
+      .rail nav button.active {
+        background: var(--tint);
+        color: var(--green);
+      }
+      .rail-bottom {
+        margin-top: auto;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: #a6abb2;
+        border-radius: 50%;
+        margin-right: 7px;
+      }
+      .dot.online {
+        background: #3c6873;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        height: 100dvh;
+      }
+      header {
+        min-height: 88px;
+        padding: 23px 34px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+      }
+      header h1 {
+        font: 19px var(--serif);
+        margin: 0;
+      }
+      .badge {
+        font-size: 11px;
+        background: var(--tint);
+        color: var(--green);
+        padding: 5px 10px;
+        border-radius: 20px;
+        white-space: nowrap;
+      }
+      .view {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .messages {
+        flex: 1;
+        overflow: auto;
+        padding: 32px max(28px, calc((100% - 700px) / 2));
+        scroll-behavior: smooth;
+      }
+      .message {
+        margin-bottom: 27px;
+        max-width: 700px;
+      }
+      .message .who {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+      }
+      .message.user {
+        margin-left: 12%;
+        background: #eceff2;
+        padding: 15px 19px;
+        border-radius: 15px 15px 3px 15px;
+      }
+      .message.user .who {
+        display: none;
+      }
+      .message .body {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.9;
+      }
+      .message.user .body {
+        white-space: pre-wrap;
+      }
+      .message pre {
+        overflow: auto;
+        white-space: pre-wrap;
+        background: var(--tint);
+        padding: 12px;
+        border-radius: 8px;
+      }
+      .message table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      .message th,
+      .message td {
+        border: 1px solid var(--line);
+        padding: 6px 9px;
+        text-align: left;
+      }
+      .message blockquote {
+        border-left: 2px solid #d5d9df;
+        margin: 12px 0;
+        padding-left: 14px;
+        color: var(--muted);
+      }
+      .message h1,
+      .message h2,
+      .message h3 {
+        font-size: 17px;
+      }
+      .message a {
+        color: var(--green);
+      }
+      .message img {
+        display: none;
+      }
+      .message p {
+        margin: 0 0 10px;
+      }
+      .message p:last-child {
+        margin: 0;
+      }
+      .message code {
+        background: var(--tint);
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      .message .error {
+        font-size: 12px;
+        color: #995f43;
+        margin-top: 10px;
+      }
+      .composer-wrap {
+        padding: 0 30px 20px;
+      }
+      .composer {
+        max-width: 760px;
+        margin: auto;
+        background: var(--white);
+        border: 1px solid #e1e4e8;
+        border-radius: 16px;
+        padding: 13px 14px 10px;
+        box-shadow: 0 5px 22px #35383d08;
+      }
+      .composer textarea {
+        display: block;
+        resize: none;
+        width: 100%;
+        height: 70px;
+        max-height: 180px;
+        border: 0;
+        outline: 0 !important;
+        background: transparent;
+        padding: 0 3px;
+        color: var(--ink);
+      }
+      .composer-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .send {
+        background: var(--green);
+        color: white;
+        border: 0;
+        padding: 6px 15px;
+      }
+      .send:hover {
+        background: #2b505a;
+      }
+      .context {
+        background: #f5f6f7;
+        padding: 32px 24px;
+        border-left: 1px solid var(--line);
+        overflow: auto;
+        height: 100dvh;
+      }
+      .context h2 {
+        font: 19px var(--serif);
+        margin: 0 0 5px;
+      }
+      .context-time {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 30px;
+      }
+      .context-section {
+        padding-bottom: 23px;
+        margin-bottom: 23px;
+        border-bottom: 1px solid var(--line);
+      }
+      .context-section h3 {
+        font-size: 11px;
+        color: var(--muted);
+        letter-spacing: 1px;
+        font-weight: 400;
+        margin: 0 0 13px;
+      }
+      .context-section p {
+        margin: 5px 0;
+      }
+      .metric {
+        font: 25px var(--serif);
+      }
+      .metric small {
+        font:
+          12px -apple-system,
+          sans-serif;
+        color: var(--muted);
+      }
+      .subtle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .event {
+        margin: 10px 0;
+        padding-left: 11px;
+        border-left: 2px solid #d5d9df;
+      }
+      .event small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .device {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 8px 0;
+        font-size: 12px;
+      }
+      .device span:last-child {
+        color: var(--muted);
+      }
+      .note {
+        background: var(--tint);
+        padding: 13px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .context button {
+        font-size: 11px;
+        padding: 5px 10px;
+      }
+      .memory-view {
+        overflow: auto;
+        padding: 28px 34px;
+      }
+      .memory-intro {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 20px;
+      }
+      .memory-card {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--white);
+        margin-bottom: 20px;
+      }
+      .memory-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .memory-title h2 {
+        font: 18px var(--serif);
+        margin: 0;
+      }
+      .memory-title span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .memory-card textarea {
+        width: 100%;
+        height: 235px;
+        resize: vertical;
+        border: 0;
+        background: transparent;
+        line-height: 1.8;
+        color: var(--ink);
+      }
+      .memory-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        gap: 12px;
+      }
+      .memory-actions span {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 20px;
+      }
+      .setting {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 12px;
+      }
+      .setting input,
+      .setting select {
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      .setting small,
+      details > summary {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .setting.wide {
+        grid-column: 1/-1;
+      }
+      .setting.check {
+        flex-direction: row;
+        align-items: center;
+      }
+      .setting.check input {
+        width: auto;
+      }
+      .memory-card .prompt-editor {
+        height: 300px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        font-size: 13px;
+      }
+      .settings-footer {
+        position: sticky;
+        bottom: -28px;
+        background: var(--paper);
+        padding: 16px 0;
+        margin-bottom: 24px;
+        border-top: 1px solid var(--line);
+      }
+      details > summary {
+        cursor: pointer;
+        margin-bottom: 16px;
+      }
+      .notice {
+        font-size: 12px;
+        color: #8c623e;
+        padding: 9px 34px;
+        background: #f3ead8;
+      }
+      .hidden {
+        display: none !important;
+      }
+      @media (min-width: 1500px) {
+        .app {
+          grid-template-columns: 230px minmax(340px, 1fr) 320px;
+        }
+      }
+      @media (max-width: 1050px) {
+        .app {
+          grid-template-columns: 165px minmax(320px, 1fr);
+        }
+        .rail {
+          padding: 28px 15px;
+        }
+        .context {
+          display: none;
+        }
+        header {
+          padding: 22px 25px;
+        }
+      }
+      @media (max-width: 600px) {
+        .app {
+          display: block;
+        }
+        .rail {
+          padding: 14px 19px;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          gap: 10px;
+        }
+        .brand {
+          font-size: 21px;
+        }
+        .rail nav {
+          display: flex;
+          gap: 0;
+        }
+        .rail nav button {
+          padding: 6px 12px;
+          font-size: 12px;
+        }
+        .rail-bottom {
+          display: none;
+        }
+        main {
+          height: calc(100dvh - 67px);
+        }
+        header {
+          min-height: 73px;
+          padding: 16px 20px;
+        }
+        .messages {
+          padding: 22px;
+        }
+        .composer-wrap {
+          padding: 0 15px 12px;
+        }
+        .memory-view {
+          padding: 20px 15px;
+        }
+        .settings-grid {
+          grid-template-columns: 1fr;
+        }
+        .settings-footer {
+          bottom: -20px;
+        }
+        .badge {
+          font-size: 10px;
+        }
+        .notice {
+          padding: 8px 20px;
+        }
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .clear-chat,
+      .delete-turn {
+        font-size: 11px;
+        color: var(--muted);
+        padding: 5px 9px;
+      }
+      .message-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+      .delete-turn {
+        background: transparent;
+        border-color: transparent;
+      }
+      .clear-chat:hover,
+      .delete-turn:hover {
+        color: #995f43;
+      }
+      @media (max-width: 600px) {
+        .header-actions {
+          gap: 6px;
+        }
+        .clear-chat {
+          padding: 5px 7px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail">
+        <div>
+          <div class="brand">
+            <svg class="logo" viewBox="18 18 72 72" aria-hidden="true">
+              <rect x="18" y="18" width="72" height="72" fill="#FFFFFF" />
+              <path
+                d="M41,35 H67 A6,6 0 0,1 73,41 V67 A6,6 0 0,1 67,73 H41 A6,6 0 0,1 35,67 V41 A6,6 0 0,1 41,35 Z"
+                fill="#999999"
+              />
+              <path d="M54,35 H67 A6,6 0 0,1 73,41 V54 H54 Z" fill="#FFFFFF" />
+              <path
+                d="M41,35 H67 A6,6 0 0,1 73,41 V67 A6,6 0 0,1 67,73 H41 A6,6 0 0,1 35,67 V41 A6,6 0 0,1 41,35 Z"
+                fill="none"
+                stroke="#000000"
+                stroke-width="3.5"
+              /></svg
+            >刻历
+          </div>
+        </div>
+        <nav aria-label="主导航">
+          <button id="navChat" class="active">◯ &nbsp; 对话</button><button id="navMemory">⚙ &nbsp; 助手设置</button>
+        </nav>
+        <div class="rail-bottom">
+          <div><i id="connectionDot" class="dot"></i><span id="connectionText">连接中……</span></div>
+          <div id="memoryStatus"></div>
+        </div>
+      </aside>
+      <main>
+        <header>
+          <div><h1 id="pageTitle">对话</h1></div>
+          <div class="header-actions">
+            <button id="clearChat" class="clear-chat" type="button" disabled>清空对话</button
+            ><span class="badge" id="modelBadge">LLM</span>
+          </div>
+        </header>
+        <div id="demoNotice" class="notice hidden">本地演示 · 环境数据与回答均为模拟，未调用真实模型。</div>
+        <section id="chatView" class="view" aria-label="聊天">
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <div class="composer-wrap">
+            <form id="chatForm" class="composer">
+              <textarea id="messageInput" placeholder="输入消息" aria-label="消息" maxlength="8000" disabled></textarea>
+              <div class="composer-bottom">
+                <span id="chatStatus">连接后开始聊天</span>
+                <div>
+                  <button id="stopButton" type="button" class="hidden">停止</button>
+                  <button id="sendButton" class="send" disabled>发送 ↑</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+        <section id="memoryView" class="view memory-view hidden" aria-label="助手设置">
+          <p class="memory-intro">在这里管理助手的提示词、记忆、屏幕便条与模型。保存后直接生效。</p>
+          <form id="settingsForm">
+            <div class="memory-card">
+              <div class="memory-title">
+                <h2>提示词</h2>
+                <span>聊天与屏幕便条共用</span>
+              </div>
+              <textarea
+                class="prompt-editor"
+                id="assistant_prompt"
+                aria-label="提示词"
+                maxlength="20000"
+                spellcheck="false"
+                disabled
+              ></textarea>
+              <p class="subtle">
+                定义助手的职责与基本行为；日常表达习惯可在下方「表达偏好」中调整。留空使用默认提示词。
+              </p>
+            </div>
+            <div class="memory-card">
+              <div class="memory-title">
+                <h2>屏幕便条</h2>
+                <span id="settingsTimezone"></span>
+              </div>
+              <div class="settings-grid">
+                <label class="setting wide"
+                  >自动检查时刻<input
+                    id="assistant_screen_times"
+                    placeholder="06:30, 11:30, 16:30, 21:00"
+                    disabled
+                  /><small>用逗号分隔，最多 24 个。留空关闭定时检查。</small></label
+                >
+                <label class="setting"
+                  >静默开始<input id="assistant_screen_quiet_start" type="time" required disabled /></label
+                ><label class="setting"
+                  >静默结束<input id="assistant_screen_quiet_end" type="time" required disabled /><small
+                    >开始与结束相同即关闭静默。</small
+                  ></label
+                >
+                <label class="setting"
+                  >两次更新至少间隔（分钟）<input
+                    id="assistant_screen_min_minutes"
+                    type="number"
+                    min="0"
+                    max="1440"
+                    required
+                    disabled /></label
+                ><label class="setting"
+                  >每小时最多更新次数<input
+                    id="assistant_screen_max_per_hour"
+                    type="number"
+                    min="1"
+                    max="60"
+                    required
+                    disabled
+                /></label>
+                <label class="setting"
+                  >屏幕新闻<select id="assistant_news_mode" disabled>
+                    <option value="off">不播报</option>
+                    <option value="morning">仅早间</option>
+                    <option value="morning_and_major">早间与重大新闻</option>
+                  </select></label
+                ><label class="setting"
+                  >重大新闻至少间隔（小时）<input
+                    id="assistant_news_interval_hours"
+                    type="number"
+                    min="1"
+                    max="168"
+                    required
+                    disabled
+                /></label>
+              </div>
+              <p class="subtle">检查后，助手会根据内容是否有变化决定更新或保留便条。新闻设置只影响屏幕播报。</p>
+            </div>
+            <div class="memory-card">
+              <div class="memory-title">
+                <h2>模型</h2>
+                <span>LLM 接口</span>
+              </div>
+              <div class="settings-grid">
+                <label class="setting">模型名称<input id="llm_model" maxlength="120" required disabled /></label
+                ><label class="setting"
+                  >API Key<input
+                    id="llm_api_key"
+                    type="password"
+                    maxlength="1024"
+                    autocomplete="new-password"
+                    placeholder="留空保留已有密钥"
+                    disabled /><small id="apiKeyStatus"></small
+                ></label>
+                <label class="setting check"><input id="llm_thinking" type="checkbox" disabled />启用 Thinking</label
+                ><label class="setting"
+                  >推理强度<select id="llm_reasoning_effort" disabled>
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                    <option value="max">Max</option>
+                  </select></label
+                >
+                <label class="setting"
+                  >生成 Token 上限<input
+                    id="llm_max_tokens"
+                    type="number"
+                    min="0"
+                    max="393216"
+                    required
+                    disabled
+                  /><small>0 使用模型默认值。</small></label
+                ><label class="setting"
+                  >上下文 Token 预算<input
+                    id="assistant_context_tokens"
+                    type="number"
+                    min="16384"
+                    max="131072"
+                    required
+                    disabled
+                /></label>
+              </div>
+              <details>
+                <summary>连接设置</summary>
+                <div class="settings-grid">
+                  <label class="setting wide"
+                    >API 地址<input id="llm_base_url" type="url" maxlength="2048" required disabled /></label
+                  ><label class="setting check wide"
+                    ><input id="clearApiKey" type="checkbox" disabled />清除已保存的 API Key</label
+                  >
+                </div>
+              </details>
+            </div>
+            <div class="memory-card">
+              <div class="memory-title"><h2>记忆与资料来源</h2></div>
+              <div class="settings-grid">
+                <label class="setting"
+                  >短期记忆默认保留（天）<input
+                    id="assistant_memory_ttl_days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    required
+                    disabled
+                /></label>
+              </div>
+              <details>
+                <summary>日历与 HA 实体</summary>
+                <div class="settings-grid">
+                  <label class="setting wide"
+                    >日历<input id="calendars" placeholder="calendar.personal, calendar.family" disabled /><small
+                      >多个实体用逗号分隔。</small
+                    ></label
+                  >
+                  <label class="setting wide"
+                    >在家检测<input
+                      id="assistant_presence_entities"
+                      placeholder="person.user, device_tracker.phone"
+                      disabled /></label
+                  ><label class="setting wide"
+                    >补充设备与传感器<input
+                      id="assistant_entities"
+                      placeholder="humidifier.bedroom, sensor.co2"
+                      disabled
+                  /></label>
+                  <label class="setting wide"
+                    >屏幕便条文本实体<input
+                      id="assistant_text_entity"
+                      placeholder="input_text.mono_calendar_assistant"
+                      disabled /></label
+                  ><label class="setting wide"
+                    >屏幕图片实体<input id="assistant_image_entity" placeholder="image.example" disabled /></label
+                  ><label class="setting wide"
+                    >新闻邮件实体<input id="assistant_newsletter_entity" placeholder="sensor.newsletter" disabled
+                  /></label>
+                </div>
+              </details>
+            </div>
+            <div class="memory-actions settings-footer">
+              <span id="settingsStatus" role="status"></span
+              ><button id="saveSettings" class="send" disabled>保存助手设置</button>
+            </div>
+          </form>
+          <div class="memory-card">
+            <div class="memory-title">
+              <h2>表达偏好</h2>
+              <span id="styleCount">0 / 3000</span>
+            </div>
+            <textarea id="styleMemory" aria-label="表达偏好" spellcheck="false" disabled></textarea>
+            <div class="memory-actions">
+              <span>AI 根据明确反馈更新，你也可直接编辑；只影响聊天和便条表达。</span
+              ><button id="saveStyle" disabled>保存修改</button>
+            </div>
+          </div>
+          <div class="memory-card">
+            <div class="memory-title">
+              <h2>长期记忆</h2>
+              <span id="longCount">0 / 3000</span>
+            </div>
+            <textarea id="longMemory" aria-label="长期记忆" spellcheck="false" disabled></textarea>
+            <div class="memory-actions">
+              <span>稳定偏好、习惯与长期约定</span><button id="saveLong" disabled>保存修改</button>
+            </div>
+          </div>
+          <div class="memory-card">
+            <div class="memory-title">
+              <h2>短期记忆</h2>
+              <span id="shortCount">0 / 6000</span>
+            </div>
+            <textarea id="shortMemory" aria-label="短期记忆" spellcheck="false" disabled></textarea>
+            <div class="memory-actions">
+              <span>近期计划、临时偏好与未结束的事</span><button id="saveShort" disabled>保存修改</button>
+            </div>
+          </div>
+          <div class="memory-actions">
+            <span id="saveStatus" role="status"></span><button id="reloadMemory">重新载入全部</button>
+          </div>
+        </section>
+      </main>
+      <aside class="context">
+        <h2>环境</h2>
+        <div id="contextTime" class="context-time"></div>
+        <div id="contextContent"></div>
+      </aside>
+    </div>
+    <script type="module">
+      import * as smd from '/assets/markdown.js?v=0.2.15';
+      ('use strict');
+      const $ = (id) => document.getElementById(id);
+      function setDisabled(ids, disabled) {
+        for (const id of ids) $(id).disabled = disabled;
+      }
+      let state = null;
+      let controller = null;
+      let chatBusy = false;
+      let pollTimer = null;
+      let panelChecking = false;
+      let panelFeedback = '';
+      let deleting = false;
+      const deleteButtons = new Set();
+      const dirty = { style: false, long_term: false, short_term: false };
+      let settingsDirty = false;
+      let settingsRevision = null;
+      const settingsFields = {
+        assistant_prompt: 'text',
+        assistant_screen_times: 'list',
+        assistant_screen_quiet_start: 'text',
+        assistant_screen_quiet_end: 'text',
+        assistant_screen_min_minutes: 'number',
+        assistant_screen_max_per_hour: 'number',
+        assistant_news_mode: 'text',
+        assistant_news_interval_hours: 'number',
+        llm_model: 'text',
+        llm_thinking: 'boolean',
+        llm_reasoning_effort: 'text',
+        llm_max_tokens: 'number',
+        assistant_context_tokens: 'number',
+        llm_base_url: 'text',
+        assistant_memory_ttl_days: 'number',
+        calendars: 'list',
+        assistant_presence_entities: 'list',
+        assistant_entities: 'list',
+        assistant_text_entity: 'text',
+        assistant_image_entity: 'text',
+        assistant_newsletter_entity: 'text',
+      };
+      function readSettings() {
+        const options = {};
+        for (const [key, type] of Object.entries(settingsFields)) {
+          const input = $(key);
+          if (type === 'boolean') {
+            options[key] = input.checked;
+            continue;
+          }
+          if (type === 'number') {
+            options[key] = Number(input.value);
+            continue;
+          }
+          if (type === 'list') {
+            options[key] = input.value.split(/[\s,，]+/).filter(Boolean);
+            continue;
+          }
+          options[key] = input.value;
+        }
+        if ($('clearApiKey').checked) options.llm_api_key = '';
+        else if ($('llm_api_key').value) options.llm_api_key = $('llm_api_key').value;
+        return options;
+      }
+      function syncSettings() {
+        const settings = state.settings;
+        if (!settings) return;
+        for (const [key, type] of Object.entries(settingsFields)) {
+          const input = $(key);
+          if (!settingsDirty) {
+            const value = settings.options[key];
+            if (type === 'boolean') input.checked = value;
+            else input.value = type === 'list' ? value.join(', ') : value;
+          }
+          input.disabled = !settings.writable;
+        }
+        setDisabled(['llm_api_key', 'clearApiKey', 'saveSettings'], !settings.writable);
+        if (!settingsDirty) settingsRevision = settings.revision;
+        $('settingsTimezone').textContent = state.context.timezone;
+        $('apiKeyStatus').textContent = settings.api_key_configured ? '已配置；留空保留。' : '尚未配置';
+      }
+      for (const key of [...Object.keys(settingsFields), 'llm_api_key', 'clearApiKey'])
+        $(key).oninput = () => {
+          settingsDirty = true;
+          $('settingsStatus').textContent = '有未保存的修改';
+        };
+      $('settingsForm').onsubmit = async (event) => {
+        event.preventDefault();
+        const options = readSettings();
+        const draft = JSON.stringify(options);
+        $('saveSettings').disabled = true;
+        $('settingsStatus').textContent = '正在保存……';
+        try {
+          const result = await requestJson('/assistant/settings', {
+            method: 'PUT',
+            body: JSON.stringify({ options, revision: settingsRevision }),
+          });
+          state.settings = result.settings;
+          settingsRevision = result.settings.revision;
+          settingsDirty = JSON.stringify(readSettings()) !== draft;
+          if (!settingsDirty) {
+            $('llm_api_key').value = '';
+            $('clearApiKey').checked = false;
+          }
+          syncSettings();
+          $('settingsStatus').textContent = settingsDirty
+            ? '已保存，另有未保存的修改'
+            : '已保存，下次对话或屏幕检查使用新设置。';
+          await loadState();
+        } catch (error) {
+          $('settingsStatus').textContent = error.message;
+        } finally {
+          $('saveSettings').disabled = state.settings?.writable === false;
+        }
+      };
+      const editorRevisions = {};
+      const fields = {
+        style: ['styleMemory', 'styleCount', 'saveStyle'],
+        long_term: ['longMemory', 'longCount', 'saveLong'],
+        short_term: ['shortMemory', 'shortCount', 'saveShort'],
+      };
+      const memoryLabels = { idle: '', pending: '整理记忆中', saved: '记忆已更新', failed: '记忆整理未完成' };
+      async function request(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...options.headers },
+        });
+        if (!response.ok) {
+          let message = '请求失败，请稍后重试。';
+          try {
+            message = (await response.json()).error || message;
+          } catch {}
+          throw new Error(message);
+        }
+        return response;
+      }
+      async function requestJson(path, options) {
+        const response = await request(path, options);
+        return response.json();
+      }
+      function node(tag, text, className) {
+        const element = document.createElement(tag);
+        if (text != null) element.textContent = text;
+        if (className) element.className = className;
+        return element;
+      }
+      function safeRenderer(element) {
+        const renderer = smd.default_renderer(element);
+        const set = renderer.set_attr;
+        renderer.set_attr = (data, type, value) => {
+          const current = data.nodes[data.index];
+          if (current.tagName === 'IMG') return;
+          if (current.tagName === 'A') {
+            let url;
+            try {
+              url = new URL(value, location.origin);
+            } catch {
+              return;
+            }
+            if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) return;
+            current.setAttribute('rel', 'noopener noreferrer');
+            current.setAttribute('target', '_blank');
+          }
+          set(data, type, value);
+        };
+        return renderer;
+      }
+      function bodyText(element, text) {
+        element.replaceChildren();
+        const parser = smd.parser(safeRenderer(element));
+        smd.parser_write(parser, text);
+        smd.parser_end(parser);
+      }
+      function addMessage(role, text, id) {
+        const wrap = node('article', null, 'message ' + role);
+        wrap.append(node('div', role === 'user' ? '你' : '助手', 'who'));
+        const body = node('div', null, 'body');
+        if (role === 'user') body.textContent = text;
+        else bodyText(body, text);
+        wrap.append(body);
+        if (role === 'user' && id) {
+          const actions = node('div', null, 'message-actions');
+          const button = node('button', '删除这一轮', 'delete-turn');
+          button.type = 'button';
+          button.setAttribute('aria-label', '删除这条消息及对应的回复');
+          button.onclick = () => deleteChat(id);
+          deleteButtons.add(button);
+          actions.append(button);
+          wrap.append(actions);
+        }
+        $('messages').append(wrap);
+        return { wrap, body };
+      }
+      function renderMessages() {
+        deleteButtons.clear();
+        $('messages').replaceChildren();
+        state.messages.forEach((message) => addMessage(message.role, message.content, message.id));
+        setBusy(chatBusy);
+      }
+      async function deleteChat(id) {
+        if (chatBusy || deleting || state?.busy) return;
+        if (
+          !confirm(
+            (id ? '删除这一轮问答？' : '清空全部对话？此操作无法恢复。') + '已保存的记忆需在「助手设置」中单独删除。',
+          )
+        )
+          return;
+        deleting = true;
+        setBusy(chatBusy);
+        $('chatStatus').textContent = '正在删除……';
+        try {
+          const result = await requestJson('/assistant/chat', {
+            method: 'DELETE',
+            body: JSON.stringify({ ...(id ? { id } : { all: true }), revision: state.chat_revision }),
+          });
+          Object.assign(state, result);
+          renderMessages();
+          $('chatStatus').textContent = id ? '已删除这一轮对话。' : '已清空对话。';
+        } catch (error) {
+          $('chatStatus').textContent = error.message;
+        } finally {
+          deleting = false;
+          setBusy(chatBusy);
+        }
+      }
+      $('clearChat').onclick = () => deleteChat();
+      function scrollBottom() {
+        $('messages').scrollTop = $('messages').scrollHeight;
+      }
+      function setBusy(value) {
+        chatBusy = value;
+        const locked = value || deleting || state?.busy;
+        $('sendButton').disabled = locked || !state?.enabled;
+        $('messageInput').disabled = deleting || !state?.enabled;
+        $('stopButton').classList.toggle('hidden', !value);
+        $('clearChat').disabled = locked || !state?.messages.length || state?.history_writable === false;
+        for (const button of deleteButtons) button.disabled = locked || state?.history_writable === false;
+      }
+      function localTime(instant) {
+        if (!instant) return '';
+        try {
+          return new Intl.DateTimeFormat('zh-CN', {
+            timeZone: state.context.timezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+          }).format(new Date(instant));
+        } catch {
+          return '';
+        }
+      }
+      function renderContext() {
+        const context = state.context;
+        const root = $('contextContent');
+        root.replaceChildren();
+        $('contextTime').textContent = context.now || '时间未知';
+        function section(title) {
+          const box = node('section', null, 'context-section');
+          box.append(node('h3', title));
+          root.append(box);
+          return box;
+        }
+        const agenda = section('日历');
+        let availabilityText = '日程状态未知';
+        if (context.availability?.status === 'calendar_busy') availabilityText = '有进行中的日程';
+        else if (context.availability?.status === 'no_calendar_event') availabilityText = '暂无进行中的日程';
+        agenda.append(node('p', availabilityText));
+        const events = (context.schedule || []).slice(0, 3);
+        events.forEach((event) => {
+          const eventElement = node('div', event.title, 'event');
+          eventElement.append(
+            node('small', event.all_day ? '全天条目' : localTime(event.start) + ' — ' + localTime(event.end)),
+          );
+          agenda.append(eventElement);
+        });
+        if (!events.length)
+          agenda.append(
+            node(
+              'p',
+              {
+                ok: '暂无后续日程',
+                unconfigured: '未配置日历',
+                stale: '日历数据已过期',
+                unavailable: '日历不可用',
+                loading: '正在同步日历',
+              }[context.schedule_status] || '暂无日历数据',
+              'subtle',
+            ),
+          );
+        const weather = section('天气');
+        weather.append(node('div', (context.weather?.now?.temp ?? '—') + ' °C', 'metric'));
+        weather.append(
+          node(
+            'p',
+            [context.weather?.city, context.weather?.now?.text].filter(Boolean).join(' · ') || '暂无天气数据',
+            'subtle',
+          ),
+        );
+        const indoor = section('室内');
+        indoor.append(
+          node(
+            'div',
+            (context.indoor?.temperature ?? '—') + ' °C  /  ' + (context.indoor?.humidity ?? '—') + ' %',
+            'metric',
+          ),
+        );
+        indoor.append(node('p', '温度 / 湿度', 'subtle'));
+        for (const device of (context.devices || []).slice(0, 5)) {
+          const deviceElement = node('div', null, 'device');
+          deviceElement.append(node('span', device.attributes?.friendly_name || device.entity_id));
+          deviceElement.append(
+            node('span', device.available ? { on: '开启', off: '关闭' }[device.state] || device.state : '不可用'),
+          );
+          indoor.append(deviceElement);
+        }
+        if (context.sources?.ha !== 'ok') indoor.append(node('p', 'HA 暂不可用，以上可能是旧数据。', 'subtle'));
+        const panel = section('屏幕便条');
+        for (const line of context.previous?.lines || []) panel.append(node('p', line, 'note'));
+        if (!context.previous?.lines?.length) panel.append(node('p', '暂无便条', 'subtle'));
+        const refresh = node('button', panelChecking ? '检查中……' : '检查更新');
+        refresh.type = 'button';
+        refresh.disabled = panelChecking;
+        refresh.onclick = async () => {
+          panelChecking = true;
+          panelFeedback = '';
+          renderContext();
+          try {
+            const result = await requestJson('/assistant/panel', { method: 'POST', body: '{}' });
+            panelFeedback = result.message || '检查已完成。';
+            await loadState();
+          } catch (error) {
+            panelFeedback = error.message;
+          } finally {
+            panelChecking = false;
+            renderContext();
+          }
+        };
+        panel.append(refresh);
+        const feedback = node('p', panelFeedback, 'subtle');
+        feedback.setAttribute('role', 'status');
+        panel.append(feedback);
+      }
+      function syncMemory() {
+        for (const [kind, [input, count, save]] of Object.entries(fields)) {
+          const doc = state.memory[kind];
+          if (!doc) {
+            setDisabled([input, save], true);
+            continue;
+          }
+          if (!dirty[kind]) {
+            $(input).value = doc.text;
+            editorRevisions[kind] = doc.revision;
+          }
+          setDisabled([input, save], doc.writable === false);
+          $(count).textContent = [...$(input).value].length + ' / ' + doc.limit;
+        }
+      }
+      async function loadState(renderHistory = false) {
+        const previous = state?.chat_revision;
+        state = await requestJson('/assistant/state');
+        $('connectionDot').classList.add('online');
+        $('connectionText').textContent = '已连接';
+        $('memoryStatus').textContent = memoryLabels[state.memory_status] || '';
+        $('modelBadge').textContent = state.model;
+        $('demoNotice').classList.toggle('hidden', !state.demo);
+        syncMemory();
+        syncSettings();
+        renderContext();
+        setBusy(chatBusy);
+        if (!chatBusy && !deleting)
+          $('chatStatus').textContent = state.enabled
+            ? 'Enter 发送 · Shift + Enter 换行'
+            : '先在助手设置中填写 API Key';
+        if (renderHistory || (!chatBusy && !deleting && previous !== state.chat_revision)) {
+          renderMessages();
+          if (renderHistory) scrollBottom();
+        }
+        clearTimeout(pollTimer);
+        if (state.memory_status === 'pending' || state.busy)
+          pollTimer = setTimeout(() => loadState().catch(() => {}), 3000);
+      }
+      function switchView(memory) {
+        $('chatView').classList.toggle('hidden', memory);
+        $('memoryView').classList.toggle('hidden', !memory);
+        $('clearChat').classList.toggle('hidden', memory);
+        $('navChat').classList.toggle('active', !memory);
+        $('navMemory').classList.toggle('active', memory);
+        $('pageTitle').textContent = memory ? '助手设置' : '对话';
+        if (typeof history !== 'undefined')
+          history.replaceState(null, '', memory ? '#settings' : location.pathname + location.search);
+      }
+      $('navChat').onclick = () => switchView(false);
+      $('navMemory').onclick = () => switchView(true);
+      for (const [kind, [input, count, save]] of Object.entries(fields)) {
+        $(input).oninput = () => {
+          dirty[kind] = true;
+          $(count).textContent = [...$(input).value].length + ' / ' + state.memory[kind].limit;
+        };
+        $(save).onclick = async () => {
+          const text = $(input).value;
+          $(save).disabled = true;
+          $('saveStatus').textContent = '正在保存……';
+          try {
+            const result = await requestJson('/assistant/memory', {
+              method: 'PUT',
+              body: JSON.stringify({ kind, text, revision: editorRevisions[kind] }),
+            });
+            dirty[kind] = $(input).value !== text;
+            state.memory = result.memory;
+            editorRevisions[kind] = state.memory[kind].revision;
+            syncMemory();
+            $('saveStatus').textContent = '已保存';
+          } catch (error) {
+            $('saveStatus').textContent = error.message;
+          } finally {
+            $(save).disabled = state.memory[kind]?.writable === false;
+          }
+        };
+      }
+      $('reloadMemory').onclick = async () => {
+        if ((settingsDirty || Object.values(dirty).some(Boolean)) && !confirm('重新载入会放弃尚未保存的编辑，继续吗？'))
+          return;
+        for (const kind of Object.keys(dirty)) dirty[kind] = false;
+        settingsDirty = false;
+        $('llm_api_key').value = '';
+        $('clearApiKey').checked = false;
+        try {
+          await loadState();
+          $('saveStatus').textContent = '已重新载入。';
+        } catch (error) {
+          $('saveStatus').textContent = error.message;
+        }
+      };
+      $('messageInput').onkeydown = (event) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+          event.preventDefault();
+          if (!chatBusy) $('chatForm').requestSubmit();
+        }
+      };
+      $('stopButton').onclick = () => controller?.abort();
+      $('chatForm').onsubmit = async (event) => {
+        event.preventDefault();
+        const message = $('messageInput').value.trim();
+        if (!message || chatBusy || deleting || state?.busy || !state?.enabled) return;
+        setBusy(true);
+        $('messageInput').value = '';
+        addMessage('user', message);
+        const answer = addMessage('assistant', '');
+        let text = '';
+        let complete = false;
+        let buffer = '';
+        let frame = 0;
+        const parser = smd.parser(safeRenderer(answer.body));
+        const flush = () => {
+          frame = 0;
+          const list = $('messages');
+          const follow = list.scrollHeight - list.scrollTop - list.clientHeight < 100;
+          smd.parser_write(parser, buffer);
+          buffer = '';
+          if (follow) scrollBottom();
+        };
+        controller = new AbortController();
+        $('chatStatus').textContent = '思考中……';
+        scrollBottom();
+        try {
+          const response = await request('/assistant/chat', {
+            method: 'POST',
+            body: JSON.stringify({ message }),
+            signal: controller.signal,
+          });
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let pending = '';
+          function process(line) {
+            if (!line.startsWith('data:')) return;
+            const event = JSON.parse(line.slice(5));
+            if (event.type === 'delta') {
+              text += event.text;
+              buffer += event.text;
+              if (!frame) frame = requestAnimationFrame(flush);
+              $('chatStatus').textContent = '正在回答……';
+            }
+            if (event.type === 'done') {
+              complete = true;
+              $('chatStatus').textContent = '整理记忆中';
+            }
+            if (event.type === 'error') throw new Error(event.message);
+          }
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            pending += decoder.decode(value, { stream: true });
+            let end;
+            while ((end = pending.indexOf('\n')) !== -1) {
+              process(pending.slice(0, end));
+              pending = pending.slice(end + 1);
+            }
+          }
+          pending += decoder.decode();
+          if (pending.trim()) process(pending);
+          if (!complete) throw new Error('连接中断，回答未完整完成。');
+        } catch (error) {
+          answer.wrap.append(node('div', error.name === 'AbortError' ? '已停止接收。' : error.message, 'error'));
+          if (!text) answer.body.textContent = '回答未完成。';
+        } finally {
+          if (frame) cancelAnimationFrame(frame);
+          flush();
+          smd.parser_end(parser);
+          controller = null;
+          setBusy(false);
+          if (complete) await loadState(true).catch(() => {});
+          else $('chatStatus').textContent = '可以重新发送';
+          $('messageInput').focus();
+          scrollBottom();
+        }
+      };
+      try {
+        await loadState(true);
+        if (typeof location !== 'undefined' && location.hash === '#settings') switchView(true);
+        else $('messageInput').focus();
+      } catch (error) {
+        $('connectionText').textContent = '连接失败';
+        $('chatStatus').textContent = error.message + ' 刷新页面重试。';
+      }
+    </script>
+  </body>
+</html>

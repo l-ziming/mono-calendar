@@ -1,0 +1,75 @@
+# Home Assistant package for one NYT newsletter candidate, read from your mailbox by the IMAP integration.
+# IMAP setup is in Settings > Devices & services. The user enters their own app password.
+# Folder: the one receiving the newsletter (News here); search: UNDELETED SENTSINCE 01-Jan-2026;
+# SSL verification: enabled. Never select headers.
+# The fixed lower date bound keeps receiving future mail; it does not need a daily update.
+# Choose "text" in the IMAP event options for the initial 2048-byte fallback.
+#
+# Paste the complete deploy/home-assistant/imap-newsletter-template.txt into the IMAP custom event data template.
+# It removes HTML head/style/script and tracking URLs, retains linked text and line breaks,
+# and prefixes only one actual NYT URL origin found in the source as a source hint.
+# Explicit ads are removed by paired HTML markers or standalone labels; without a clear
+# editorial resume boundary, text after an ad label is discarded. Inline mentions are retained.
+# then limits the body to 6000 characters. Truncating raw HTML first can keep only CSS and no news.
+# The custom template sees the entire text before the normal event-text truncation.
+# 6000 Unicode characters use at most 24000 UTF-8 bytes, leaving room below the 32168-byte
+# event limit for the normal text and metadata. Do not enable full headers or raise the text limit.
+# See https://www.home-assistant.io/integrations/imap/#using-events
+#
+# Replace entry_id below with your own IMAP integration entry ID, and folder with your folder.
+# Use the created entity as entities.newsletter: sensor.mono_calendar_nyt_newsletter in Mono Calendar.
+# The app accepts today's original sent Date, never this sensor's update time as publication time.
+# The current sensor holds the latest NYT email only; other senders do not replace it.
+# Conventional forwards need an original From line from an NYT domain. The app additionally
+# validates their original Date and NYT link before accepting the forwarded issue as a candidate.
+# Apple Hide My Email is accepted only for an encoded NYT sender at privaterelay.appleid.com
+# and a real NYT-domain URL in the body; other relay addresses cannot replace this sensor.
+# Sender/forwarded-header checks indicate source, not cryptographic sender authentication.
+#
+# Merge these exclusions into your existing recorder section, keeping its other settings:
+# recorder:
+#   exclude:
+#     entities:
+#       - sensor.mono_calendar_nyt_newsletter
+#     event_types:
+#       - imap_content
+# These exclusions prevent newsletter bodies and raw IMAP events being stored in recorder history.
+# They do not erase already recorded history or HA's restored current sensor state.
+# See https://www.home-assistant.io/integrations/recorder/#configure-filter
+template:
+  - triggers:
+      - trigger: event
+        event_type: imap_content
+        event_data:
+          entry_id: REPLACE_WITH_YOUR_IMAP_ENTRY_ID
+          folder: News
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.initial | default(true) }}"
+      - condition: template
+        value_template: >-
+          {% set sender = trigger.event.data.sender | default('', true) | string %}
+          {% set custom = trigger.event.data.custom | default('') %}
+          {% set fallback = trigger.event.data.text | default('', true) %}
+          {% set body = custom if custom is string and custom | trim else fallback %}
+          {% set address = '[^\\s<>@]+@(?:[a-z0-9-]+\\.)*(?:nytimes\\.com|newyorktimes\\.com)' %}
+          {% set mailbox = '(?:' ~ address ~ '|[^<>\\r\\n]*<' ~ address ~ '>)' %}
+          {% set relay_address = '[a-z0-9.+_-]+_at_(?:nytimes_com|newyorktimes_com)_[a-z0-9]+(?:_[a-z0-9]+)*@privaterelay\\.appleid\\.com' %}
+          {% set relay_mailbox = '(?:' ~ relay_address ~ '|[^<>\\r\\n]*<' ~ relay_address ~ '>)' %}
+          {% set nyt_url = '(?i)https?://(?:[a-z0-9-]+\\.)*(?:nytimes\\.com|newyorktimes\\.com)(?:[/?#\\s<>"\\x27]|$)' %}
+          {{ sender | regex_match('(?i)^\\s*' ~ mailbox ~ '\\s*$')
+             or (sender | regex_match('(?i)^\\s*' ~ relay_mailbox ~ '\\s*$') and body is string and body | regex_search(nyt_url))
+             or (body is string and body[:4000] | regex_search('(?im)^\\s*>?\\s*(?:From|发件人)\\s*[:：]\\s*' ~ mailbox ~ '\\s*$')) }}
+    sensor:
+      - name: Mono Calendar NYT Newsletter
+        default_entity_id: sensor.mono_calendar_nyt_newsletter
+        unique_id: mono_calendar_nyt_newsletter
+        state: "{{ now().isoformat() }}"
+        attributes:
+          body: >-
+            {% set custom = trigger.event.data.custom | default('') %}
+            {% set fallback = trigger.event.data.text | default('', true) %}
+            {{ (custom if custom is string and custom | trim else fallback)[:6000] }}
+          date: "{{ trigger.event.data.date | default('', true) }}"
+          subject: "{{ (trigger.event.data.subject | default('', true))[:240] }}"
+          sender: "{{ (trigger.event.data.sender | default('', true))[:320] }}"

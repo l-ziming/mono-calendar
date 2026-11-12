@@ -1,0 +1,6 @@
+# Home Assistant package; backend and HA automations can both write this same text helper.
+input_text:
+  mono_calendar_assistant:
+    name: 刻历屏幕便条
+    max: 255
+    mode: text

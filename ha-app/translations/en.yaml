@@ -1,0 +1,85 @@
+configuration:
+  display_token:
+    name: Display token
+    description: Separate token the display uses for the data and control API, at least 24 characters, matching the one set on the display. Unrelated to HA credentials.
+  timezone:
+    name: Time zone
+    description: IANA time zone name such as Asia/Shanghai. Sets dates, agenda, screen check times and quiet hours.
+  temperature_unit:
+    name: Temperature unit
+    description: Unit assumed when an HA entity reports no temperature unit; the display always shows Celsius.
+  city:
+    name: City
+    description: City name in the weather heading, also used for local news. Leave blank to use the HA location name.
+  week_start:
+    name: First day of week
+    description: 0 for Sunday, 1 for Monday.
+  aqi_standard:
+    name: AQI display standard
+    description: Only the US EPA 2024 standard is supported.
+  aqi_input_standard:
+    name: Outdoor AQI source standard
+    description: Standard used by the outdoor AQI entity, US, CN2012 or CN2026. Chinese indices are converted from the underlying concentration, never reused as US values.
+  aqi_cn_period:
+    name: Chinese AQI averaging period
+    description: For Chinese sources, the averaging period of the index; only 24h can be converted. Leave blank if unsure.
+  calendars:
+    name: Calendar entities
+    description: Optional HA calendar entity IDs such as calendar.home. Also editable in the web assistant settings.
+  entities:
+    name: Entity mapping
+    description: HA entities for each area of the display. Sensors accept entity_id#attribute; leave unused ones blank.
+  llm_api_key:
+    name: LLM API key
+    description: Leave blank to disable model generation. Stored in the HA app configuration. Restart the app after changes.
+  llm_model:
+    name: LLM model
+    description: Defaults to deepseek-flash. Enter a model ID supported by the API. Restart the app after changes.
+  llm_thinking:
+    name: Thinking mode
+    description: Enabled by default. Shared by chat, memory maintenance and screen notes. Restart the app after changes.
+  llm_reasoning_effort:
+    name: Reasoning effort
+    description: low, high or max; defaults to high. Omitted when thinking is disabled. Restart the app after changes.
+  llm_max_tokens:
+    name: Generation token limit
+    description: 0 omits the limit and uses the API default; 1–393216 caps total thinking and answer tokens, subject to the model context limit. Restart the app after changes.
+  llm_base_url:
+    name: LLM API URL
+    description: Defaults to https://api.deepseek.com. Also accepts a compatible HTTPS root ending in /v1. Restart the app after changes.
+  assistant_entities:
+    name: Additional assistant entities
+    description: Optional, up to 24 HA entity IDs such as humidifiers, lights and environmental sensors. Read-only context.
+  assistant_presence_entities:
+    name: Presence reference entities
+    description: Optional, up to 8 person, device_tracker or binary_sensor IDs. Auxiliary model context only; unknown and unavailable states remain explicit and a single device does not prove home or away. Restart the app after changes.
+  assistant_news_mode:
+    name: Screen news mode
+    description: off omits screen news; morning allows one briefing between 06:00 and noon; morning_and_major also permits major developments. Controls screen delivery only; chat can still read news. Reloaded next check.
+  assistant_news_interval_hours:
+    name: Major news interval (hours)
+    description: Minimum time between major developments published on screen, 1–168 hours, default 6. Does not restrict news available to chat. Reloaded next check.
+  assistant_screen_times:
+    name: Fixed screen check times
+    description: Up to 24 HH:MM times in the configured time zone. Each check asks the model to keep, update or clear the screen. An empty list disables automatic checks; manual refresh remains available. Reloaded next check.
+  assistant_screen_min_minutes:
+    name: Minimum screen dwell time (minutes)
+    description: Minimum interval between actual screen changes, 0–1440 minutes, default 15. Reloaded next check.
+  assistant_screen_max_per_hour:
+    name: Maximum screen updates per hour
+    description: Maximum actual screen changes in a rolling hour, 1–60, default 4. Keeping the screen does not count. Reloaded next check.
+  assistant_screen_quiet_start:
+    name: Screen quiet hours start
+    description: HH:MM in the configured time zone, default 23:00. No proactive screen changes during quiet hours. Equal start and end times disable quiet hours. Reloaded next check.
+  assistant_screen_quiet_end:
+    name: Screen quiet hours end
+    description: HH:MM in the configured time zone, default 06:00. May cross midnight. Reloaded next check.
+  assistant_context_tokens:
+    name: Context token budget
+    description: Uses UTF-8 bytes as a conservative token estimate, not an exact model tokenizer count; 16384–131072, default 32768. Reserves current context and output room; keeps complete conversation turns. Reloaded next request.
+  assistant_memory_ttl_days:
+    name: Default short-term memory lifetime (days)
+    description: Default lifetime when the user gives no expiry date, 1–365 days, default 14. Expired entries leave current memory while historical versions remain recoverable. Reloaded next request.
+  assistant_prompt:
+    name: Assistant prompt
+    description: Full prompt, reloaded for the next generation without restarting. Use the menu to edit long text in YAML. Leave blank to use the prompt file, then the bundled default.

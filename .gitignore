@@ -1,0 +1,11 @@
+.env
+config.json
+.local/
+android/build/
+dist/
+output/
+__pycache__/
+*.pyc
+# Personal assistant prompt; the published app starts with an empty one.
+ha-app/server/assistant/default-prompt.txt
+fonts-src/

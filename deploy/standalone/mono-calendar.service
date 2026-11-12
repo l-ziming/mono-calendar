@@ -1,0 +1,23 @@
+[Unit]
+Description=Mono Calendar data service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mono-calendar
+Group=mono-calendar
+WorkingDirectory=/opt/mono-calendar
+EnvironmentFile=/etc/mono-calendar.env
+ExecStart=/usr/bin/node /opt/mono-calendar/server/main.mjs /etc/mono-calendar.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=256M
+UMask=0077
+StateDirectory=mono-calendar
+
+[Install]
+WantedBy=multi-user.target

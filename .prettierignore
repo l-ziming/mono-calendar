@@ -1,0 +1,6 @@
+ha-app/server/vendor/
+android/
+output/
+dist/
+.local/
+*.md
