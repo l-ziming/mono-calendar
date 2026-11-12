@@ -1,0 +1,57 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      android_render:
+        description: Run Android checks and desktop rendering
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: Node tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: bash scripts/check.sh --node-only
+
+  android:
+    name: Android desktop rendering
+    if: github.event_name == 'workflow_dispatch' && inputs.android_render
+    needs: node
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: bash scripts/check.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-desktop-render
+          path: |
+            docs/images/sample*.png
+            output/fixture-data.png
+          if-no-files-found: error
+          retention-days: 7

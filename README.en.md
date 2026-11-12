@@ -2,6 +2,8 @@
 
 [中文](README.md) | English
 
+[![Checks](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
+
 This is a little project I work on in my spare time. I wanted a screen next to me for things like the weather, and I happened to have a Sony DPT-RP1 sitting around collecting dust, so I put it to use. Thanks to [HappyZ/dpt-tools](https://github.com/HappyZ/dpt-tools). I'm very much standing on the shoulders of giants here.
 
 There are two parts: Home Assistant and the RP1. Home Assistant collects room and environment data, controls devices, and calls an LLM API to write short notes. The Android app on the RP1 draws the page and handles simple interactions.
@@ -41,6 +43,12 @@ scripts/           Build, checks, RP1 provisioning and offline preview
 tests/             HA, model and display tests, with shared fixtures
 ```
 
+## Development checks
+
+Run `bash scripts/check.sh` from the repository root with Node.js 24 and Python 3. Set `JAVA_HOME` to JDK 17 to include the Java checks and desktop page rendering. Tests use mock HA and model services; no RP1 or live model calls are needed.
+
+GitHub Actions runs tests on pushes and pull requests. When running the workflow manually, you can also enable Android desktop rendering and download the sample images.
+
 ## Work in progress
 
 I'm also working on the RP1's system software. There isn't a ready-to-install release yet:
@@ -50,7 +58,7 @@ I'm also working on the RP1's system software. There isn't a ready-to-install re
 
 ## License
 
-- **Code**: [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in `LICENSE`.
+- **Code**: [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in [NOTICE](NOTICE).
 - **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by liziming" in their interface.
 - **Commercial use** (selling preinstalled devices, paid apps, commercial services, etc.) requires a separate license from the author; please get in touch through this repository's GitHub Issues.
-- **Third-party components** keep their own licenses: the almanac uses [lunar-javascript v1.7.8](https://github.com/6tail/lunar-javascript) and Markdown rendering uses [streaming-markdown](https://github.com/thetarnav/streaming-markdown), see `ha-app/server/vendor/`; font licenses are in `android/assets/fonts/`.
+- **Third-party components** keep their own licenses: Chinese calendar dates, solar terms and almanac data use the vendored [chinese_calendar](ha-app/server/vendor/chinese_calendar.mjs), with its [source notes](ha-app/server/vendor/CHINESE_CALENDAR.md) and [MIT license](ha-app/server/vendor/LICENSE.chinese_calendar); Markdown rendering uses [streaming-markdown](ha-app/server/vendor/STREAMING_MARKDOWN.md), under its [MIT license](ha-app/server/vendor/LICENSE.streaming-markdown); font licenses are in [android/assets/fonts/](android/assets/fonts/).
