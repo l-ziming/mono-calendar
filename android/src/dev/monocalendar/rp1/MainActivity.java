@@ -153,8 +153,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (!first && !((PowerManager) getSystemService(POWER_SERVICE)).isInteractive()) {
             quarter = true;
             WakeReceiver.wakeScreen(this, "monocalendar:power");
-        } else
-            render(false);
+        }
+        render(false);
     }
     private static final long WIFI_WAIT_MS = 20000;
     private boolean waitingWifi;

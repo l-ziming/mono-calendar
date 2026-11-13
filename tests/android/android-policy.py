@@ -49,6 +49,14 @@ if javac:
                 'Requests.java',
             )
         ]
+        receiver = (project_root / 'android/src/dev/monocalendar/rp1/WakeReceiver.java').read_text()
+        # Keep every receiver method; the test supplies its Android boundary types.
+        for android_import in ('import android.app.*;\n', 'import android.content.*;\n', 'import android.os.PowerManager;\n'):
+            assert receiver.count(android_import) == 1
+            receiver = receiver.replace(android_import, '')
+        receiver_path = Path(classes_dir) / 'WakeReceiver.java'
+        receiver_path.write_text(receiver)
+        sources.append(str(receiver_path))
         subprocess.run(
             [
                 javac,
@@ -59,6 +67,7 @@ if javac:
                 *sources,
                 str(project_root / 'tests/android/QuarterClockCheck.java'),
                 str(project_root / 'tests/android/HintRetryCheck.java'),
+                str(project_root / 'tests/android/WakeReceiverCheck.java'),
                 str(project_root / 'tests/android/AlmanacCheck.java'),
                 str(project_root / 'tests/android/WeatherCheck.java'),
                 str(project_root / 'tests/android/RemoteStateCheck.java'),
@@ -70,6 +79,7 @@ if javac:
         check_classes = [
             'QuarterClockCheck',
             'HintRetryCheck',
+            'dev.monocalendar.rp1.WakeReceiverCheck',
             'AlmanacCheck',
             'dev.monocalendar.rp1.WeatherCheck',
             'RemoteStateCheck',

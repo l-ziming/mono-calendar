@@ -326,14 +326,12 @@ public final class Page {
         } else
             ink.path(Svg.path("M16 22L2.21 8.21A19.5 19.5 0 0 1 29.79 8.21Z", wifiLeft, 87, 1), -1, 1, BLACK, false);
         if (status.warning != null && !status.warning.isEmpty()) {
-            float maxText = wifiLeft - 18 - 60 - (xm + 640);
-            String w = fit(status.warning, Math.max(120, maxText), Ink.INTER_MEDIUM, 18);
-            float left = wifiLeft - 18 - (12 + 28 + 8 + width(w, Ink.INTER_MEDIUM, 18) + 12);
+            float left = wifiLeft - 18 - (12 + 28 + 8 + width(status.warning, Ink.INTER_MEDIUM, 18) + 12);
             rect(left, 83, wifiLeft - 18, 115, BLACK);
             ink.path(Svg.path("M14 1.5L27 24.5H1Z", left + 12, 86, 1), WHITE, 2, WHITE, true);
             ink.line(left + 26, 94.5f, left + 26, 102.5f, 3.2f, BLACK, 0, 0);
             ink.circle(left + 26, 106.8f, 1.9f, BLACK, 0, -1);
-            text(w, left + 48, 107, Ink.INTER_MEDIUM, 18, WHITE);
+            text(status.warning, left + 48, 107, Ink.INTER_MEDIUM, 18, WHITE);
         }
         int hour = calendar.get(Calendar.HOUR_OF_DAY), minute = calendar.get(Calendar.MINUTE), quarter = minute / 15;
         String shichen = ""

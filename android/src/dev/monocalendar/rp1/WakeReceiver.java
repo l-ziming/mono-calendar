@@ -88,23 +88,23 @@ public final class WakeReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         SharedPreferences preferences = context.getSharedPreferences("connection", Context.MODE_PRIVATE);
-        if (!enabled(preferences)) {
-            schedule(context);
-            return;
-        }
         long now = System.currentTimeMillis();
-        if (HINT_RETRY.equals(intent.getAction())) {
-            HintRetry retry = hintRetry(preferences);
-            if (!retry.consume(intent.getLongExtra("scheduled_at", 0), now) || !saveHint(preferences, retry))
+        try {
+            if (!enabled(preferences))
                 return;
-        } else {
+            if (HINT_RETRY.equals(intent.getAction())) {
+                HintRetry retry = hintRetry(preferences);
+                if (!retry.consume(intent.getLongExtra("scheduled_at", 0), now) || !saveHint(preferences, retry))
+                    return;
+            } else {
+                if (!TICK.equals(intent.getAction())
+                    || QuarterClock.sameSlot(now, preferences.getLong("alarm_attempt", -1)))
+                    return;
+                preferences.edit().putLong("alarm_attempt", now).apply();
+            }
+        } finally {
             schedule(context);
-            if (!TICK.equals(intent.getAction())
-                || QuarterClock.sameSlot(now, preferences.getLong("alarm_attempt", -1)))
-                return;
-            preferences.edit().putLong("alarm_attempt", now).apply();
         }
-        schedule(context);
         wakeScreen(context, "monocalendar:sync");
         try {
             context.startActivity(

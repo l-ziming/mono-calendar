@@ -25,9 +25,10 @@ public final class IconRender {
         if (!box.find())
             throw new IllegalArgumentException("logo.svg needs a viewBox");
         String[] viewBox = box.group(1).trim().split("[\\s,]+");
-        float minX = Float.parseFloat(viewBox[0]);
-        float minY = Float.parseFloat(viewBox[1]);
-        float width = Float.parseFloat(viewBox[2]);
+        float crop = Float.parseFloat(System.getProperty("crop", "0"));
+        float minX = Float.parseFloat(viewBox[0]) + crop;
+        float minY = Float.parseFloat(viewBox[1]) + crop;
+        float width = Float.parseFloat(viewBox[2]) - crop * 2;
         for (int i = 1; i < args.length; i++) {
             String[] target = args[i].split(":", 2);
             int size = Integer.parseInt(target[0]);

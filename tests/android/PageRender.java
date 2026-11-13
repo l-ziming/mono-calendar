@@ -18,6 +18,7 @@ public final class PageRender implements Ink {
     private final Graphics2D graphics;
     private final Font[] fonts = new Font[FONT_FILES.length];
     private final FontRenderContext fontContext;
+    private final StringBuilder warningText = new StringBuilder();
     private Shape saved;
 
     PageRender(Graphics2D graphics, Path fontDir) throws Exception {
@@ -53,6 +54,8 @@ public final class PageRender implements Ink {
         return (float) font(fontIndex, size).getStringBounds(text, fontContext).getWidth();
     }
     public void text(String text, float x, float y, int fontIndex, float size, int gray) {
+        if (y == 107 && size == 18 && gray == 255)
+            warningText.append(text);
         if (fontIndex == Ink.SANS || fontIndex == Ink.INTER)
             throw new IllegalStateException("Design's default weight is 500: " + text);
         if ("“".equals(text) && fontIndex != Ink.SERIF_LATIN_BOLD)
@@ -172,6 +175,8 @@ public final class PageRender implements Ink {
         long started = System.nanoTime();
         List<Page.Target> targets = new Page(almanac).draw(
             ink, data, state, status, now, TimeZone.getTimeZone(timezoneId == null ? "America/Denver" : timezoneId));
+        if (!status.warning.equals(ink.warningText.toString()))
+            throw new IllegalStateException("Warning text was truncated: " + ink.warningText);
         System.err.printf("drew in %.0f ms, %d targets%n", (System.nanoTime() - started) / 1e6, targets.size());
         for (Page.Target target : targets) {
             if (target.right - target.left < 44 - 0.01 || target.bottom - target.top < 44 - 0.01)
