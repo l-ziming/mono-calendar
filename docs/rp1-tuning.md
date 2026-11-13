@@ -7,6 +7,7 @@ RP1 待机时经常被网络检查和无线流量叫醒，所以在自己的设�
 | 广播过滤与 ARP 应答 | `ipaddr 0`，ARP 由主机处理 | `ipaddr 3;<RP1 的 IPv4>`，过滤广播并代答本机 ARP |
 | Sony 网络检查 | 每 20 秒一次 | 每 5 分钟一次，之前试过 60 秒 |
 | Sony 自动发现 | `DPDiscoveryService` / `mdnsd` 运行 | 注销后停用 |
+| Wi-Fi 驱动 | `C509` | `C509.p2-rp1fix1`，安装到原厂加载器优先读取的 `/system/lib/modules` |
 | IPv6 | 启用 | `all/default.disable_ipv6=1`，退出 IPv6 地址与组播 MAC 订阅，保留 IPv4 同步；重启后重新设置 |
 | 内核诊断日志 | 过滤级别 6、`initcall_debug=N` | 过滤级别 7、`initcall_debug=N`；驱动 `diagnostic=Y`、RESET 抓栈开启，保留超时日志和故障栈 |
 | 刻历整刻闹钟 | `setExact` 被 Sony 扩窗数分钟 | `setWindow(..., 1000, ...)`，实机窗口 1 秒 |
@@ -21,6 +22,7 @@ mDNS、MLD、IGMP 仍可能叫醒 RP1，部分 IPv4 组播也会被网络侧以�
 
 ## 持久性与功能影响
 
+- **驱动补丁会保留。** Wi-Fi 重开和设备重启后都会从 `/system/lib/modules` 加载成对的补丁模块，原厂 `/lib/modules` 不变。原版备份、补丁和安装、回退步骤放在 [misc/rp1-wifi](../misc/rp1-wifi/README.md)。
 - **广播过滤和 ARP 代答是临时设置。** 先用 `ip -4 addr show dev wlan0` 查地址，再设置 `mlanutl wlan0 ipaddr "3;当前IPv4"`。IPv4 地址变了要更新；Wi-Fi 关闭再开启会清空配置，重启或驱动重载后也要核对。这个命令会重建 MEF 表，已有自定义规则时要先确认，避免覆盖。
 - **网络检查间隔会保留。** 参数是 `persist.sys.netsaver.interval=300000`，需要正常重新启用 Wi-Fi 或重启才会加载。原任务即使联网正常也会唤醒设备并持锁约 1 秒。改成 5 分钟后，断线时这条备用扫描路径比之前的 60 秒最多多等约 4 分钟，正常的 Wi-Fi 自动重连仍然工作。刻历每 15 分钟的同步闹钟独立运行。
 - **Sony 发现组件的禁用会保留。** 电脑、手机自动发现 RP1 会受影响，Wi-Fi、普通 DNS 和 IPv6 邻居发现不受这一步影响。刻历直接访问配置好的服务器，不依赖 mDNS。

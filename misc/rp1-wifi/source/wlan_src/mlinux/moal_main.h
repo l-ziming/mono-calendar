@@ -1795,6 +1795,11 @@ woal_wake_queue(struct net_device *dev)
 /** Debug Macro definition*/
 #ifdef	DEBUG_LEVEL1
 extern t_u32 drvdbg;
+extern bool diagnostic;
+/* Independent of drvdbg; no packet contents or addresses are recorded. */
+#define RP1_DIAG(fmt, args...) do { \
+	if (diagnostic) printk(KERN_INFO "rp1diag: " fmt, ##args); \
+} while (0)
 
 #define LOG_CTRL(level)     (0)
 

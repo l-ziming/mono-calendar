@@ -9949,6 +9949,9 @@ MODULE_PARM_DESC(nan_name, "NAN interface name");
 module_param(max_nan_bss, int, 0);
 MODULE_PARM_DESC(max_nan_bss, "Number of NAN interfaces (1)");
 #ifdef DEBUG_LEVEL1
+bool diagnostic;
+module_param(diagnostic, bool, 0644);
+MODULE_PARM_DESC(diagnostic, "RP1 resume diagnostics (default off)");
 module_param(drvdbg, uint, 0660);
 MODULE_PARM_DESC(drvdbg, "Driver debug");
 #endif /* DEBUG_LEVEL1 */

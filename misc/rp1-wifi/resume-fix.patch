@@ -1,0 +1,317 @@
+--- a/mlan/mlan_cmdevt.c
++++ b/mlan/mlan_cmdevt.c
+@@ -921,6 +921,11 @@
+ 				  pcmd_node->priv->bss_type));
+ 	cmd_code = wlan_le16_to_cpu(pcmd->command);
+ 	cmd_size = wlan_le16_to_cpu(pcmd->size);
++	if ((cmd_code & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
++		RP1_DIAG("SEND_BEGIN cmd=%x seq=%x ps=%u wake_req=%u wake_try=%u\n",
++			 cmd_code, wlan_le16_to_cpu(pcmd->seq_num),
++			 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
++			 pmadapter->pm_wakeup_fw_try);
+ 
+ 	pcmd_node->cmdbuf->data_len = cmd_size;
+ 
+@@ -954,6 +959,8 @@
+ 	/* Extra header for SDIO is added here */
+ 	ret = wlan_sdio_host_to_card(pmadapter, MLAN_TYPE_CMD,
+ 				     pcmd_node->cmdbuf, MNULL);
++	if ((cmd_code & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
++		RP1_DIAG("SEND_END cmd=%x status=%d\n", cmd_code, ret);
+ 
+ 	if (ret == MLAN_STATUS_FAILURE) {
+ 		PRINTM(MERROR, "DNLD_CMD: Host to Card Failed\n");
+@@ -1564,6 +1571,14 @@
+ 				      pcmd_node->cmdbuf->data_offset);
+ 
+ 	command = wlan_le16_to_cpu(pcmd->command);
++	if ((command & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
++		RP1_DIAG("QUEUE cmd=%x ps=%u wake_req=%u wake_try=%u current=%u cmd_timer=%u last_cmd=%x last_resp=%x hw=%u\n",
++			 command, pmadapter->ps_state,
++			 pmadapter->pm_wakeup_card_req, pmadapter->pm_wakeup_fw_try,
++			 pmadapter->curr_cmd != MNULL, pmadapter->cmd_timer_is_set,
++			 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
++			 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index],
++			 pmadapter->hw_status);
+ 
+ 	/* Exit_PS command needs to be queued in the header always. */
+ 	if (command == HostCmd_CMD_802_11_PS_MODE_ENH) {
+@@ -1769,6 +1784,9 @@
+ 	cmdresp_no = resp->command;
+ 
+ 	cmdresp_result = resp->result;
++	if (cmdresp_no == HostCmd_CMD_HS_WAKEUP_REASON)
++		RP1_DIAG("RESPONSE cmd=%x seq=%x result=%u\n",
++			 orig_cmdresp_no, resp->seq_num, cmdresp_result);
+ 
+ 	/* Save the last command response to debug log */
+ 	pmadapter->dbg.last_cmd_resp_index =
+@@ -1906,6 +1924,11 @@
+ 	ENTER();
+ 
+ 	pmadapter->cmd_timer_is_set = MFALSE;
++	RP1_DIAG("CMD_TIMEOUT ps=%u wake_req=%u wake_try=%u current=%u last_cmd=%x last_resp=%x\n",
++		 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
++		 pmadapter->pm_wakeup_fw_try, pmadapter->curr_cmd != MNULL,
++		 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
++		 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index]);
+ 	if (!pmadapter->curr_cmd) {
+ 		PRINTM(MWARN, "CurCmd Empty\n");
+ 		goto exit;
+--- a/mlan/mlan_decl.h
++++ b/mlan/mlan_decl.h
+@@ -27,7 +27,7 @@
+ #define _MLAN_DECL_H_
+ 
+ /** MLAN release version */
+-#define MLAN_RELEASE_VERSION		 "C509.p2"
++#define MLAN_RELEASE_VERSION		 "C509.p2-rp1fix1"
+ 
+ /** Re-define generic data types for MLAN/MOAL */
+ /** Signed char (1-byte) */
+--- a/mlan/mlan_main.h
++++ b/mlan/mlan_main.h
+@@ -37,6 +37,11 @@
+ 					     OUT t_u32 *psec, OUT t_u32 *pusec);
+ 
+ extern t_u32 mlan_drvdbg;
++/* Level zero bypasses drvdbg only when MOAL's diagnostic switch is on. */
++#define RP1_DIAG(fmt, args...) do { \
++	if (print_callback) \
++		print_callback(MNULL, 0, "rp1diag: " fmt, ##args); \
++} while (0)
+ 
+ /* Reason Code 3: STA is leaving (or has left) IBSS or ESS */
+ #define DEF_DEAUTH_REASON_CODE (0x3)
+--- a/mlan/mlan_misc.c
++++ b/mlan/mlan_misc.c
+@@ -625,6 +625,12 @@
+ 
+ 	ENTER();
+ 
++	RP1_DIAG("FW_WAKE_TIMEOUT ps=%u wake_req=%u wake_try=%u current=%u cmd_timer=%u last_cmd=%x last_resp=%x\n",
++		 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
++		 pmadapter->pm_wakeup_fw_try, pmadapter->curr_cmd != MNULL,
++		 pmadapter->cmd_timer_is_set,
++		 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
++		 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index]);
+ 	PRINTM(MERROR, "%s: ps_state=%d\n", __FUNCTION__, pmadapter->ps_state);
+ 	if (pmadapter->ps_state != PS_STATE_AWAKE) {
+ 		PRINTM(MERROR, "Wakeup card timeout!\n");
+@@ -670,6 +676,8 @@
+ 		ret = pcb->moal_write_reg(pmadapter->pmoal_handle,
+ 					  HOST_TO_CARD_EVENT_REG,
+ 					  HOST_POWER_UP);
++	RP1_DIAG("FW_WAKE_REQUEST ps=%u timeout=%u status=%d\n",
++		 pmadapter->ps_state, timeout, ret);
+ 	LEAVE();
+ 	return ret;
+ }
+--- a/mlinux/mlan_decl.h
++++ b/mlinux/mlan_decl.h
+@@ -27,7 +27,7 @@
+ #define _MLAN_DECL_H_
+ 
+ /** MLAN release version */
+-#define MLAN_RELEASE_VERSION		 "C509.p2"
++#define MLAN_RELEASE_VERSION		 "C509.p2-rp1fix1"
+ 
+ /** Re-define generic data types for MLAN/MOAL */
+ /** Signed char (1-byte) */
+--- a/mlinux/moal_eth_ioctl.c
++++ b/mlinux/moal_eth_ioctl.c
+@@ -3627,7 +3627,7 @@
+ 		req->req_id = MLAN_IOCTL_PM_CFG;
+ 		req->action = MLAN_ACT_GET;
+ 
+-		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
++		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT_TIMEOUT);
+ 		if (status != MLAN_STATUS_SUCCESS) {
+ 			ret = -EFAULT;
+ 			if (status != MLAN_STATUS_PENDING)
+--- a/mlinux/moal_ioctl.c
++++ b/mlinux/moal_ioctl.c
+@@ -367,6 +367,9 @@
+ 	mlan_status status;
+ 	wait_queue *wait = (wait_queue *)req->reserved_1;
+ 	unsigned long flags;
++	t_u32 diag_id, diag_sub, diag_code;
++	unsigned long elapsed;
++	int completed, retries;
+ 
+ 	ENTER();
+ 
+@@ -388,6 +391,14 @@
+ 		break;
+ 	}
+ 	spin_lock_irqsave(&priv->phandle->driver_lock, flags);
++	/* req and wait share an allocation. Detaching permits late completion
++	 * to free both, so never dereference them after unlocking below. */
++	diag_id = req->req_id;
++	diag_sub = *(t_u32 *)req->pbuf;
++	diag_code = req->status_code;
++	elapsed = jiffies_to_msecs(jiffies - wait->start_time);
++	completed = wait->condition;
++	retries = wait->retry;
+ 	if (wait->condition == MFALSE) {
+ 		if (wait_option == MOAL_IOCTL_WAIT_TIMEOUT) {
+ 			priv->phandle->ioctl_timeout = MTRUE;
+@@ -407,6 +418,12 @@
+ 		status = wait->status;
+ 	}
+ 	spin_unlock_irqrestore(&priv->phandle->driver_lock, flags);
++	if ((diag_id == MLAN_IOCTL_PM_CFG &&
++	     diag_sub == MLAN_OID_PM_HS_WAKEUP_REASON) || !completed)
++		RP1_DIAG("WAIT_DONE id=%x sub=%x option=%u completed=%d status=%d code=%x elapsed_ms=%lu retries=%d detached=%d\n",
++			 (unsigned)diag_id, (unsigned)diag_sub, wait_option,
++			 completed, status, (unsigned)diag_code, elapsed,
++			 retries, !completed);
+ 
+ 	LEAVE();
+ 	return status;
+@@ -2467,11 +2484,17 @@
+ 	req->action = MLAN_ACT_GET;
+ 
+ 	/* Send IOCTL request to MLAN */
++	RP1_DIAG("WAKE_QUERY_BEGIN timeout_ms=%u\n",
++		 (unsigned)jiffies_to_msecs(MOAL_IOCTL_TIMEOUT));
+ 	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT_TIMEOUT);
+ 	if (ret == MLAN_STATUS_SUCCESS) {
+ 		wakeup_reason->hs_wakeup_reason =
+ 			pmcfg->param.wakeup_reason.hs_wakeup_reason;
+ 	}
++	/* PENDING transfers ownership; only local ret/output are safe here. */
++	RP1_DIAG("WAKE_QUERY_END status=%d reason=%u\n", ret,
++		 ret == MLAN_STATUS_SUCCESS ?
++		 (unsigned)wakeup_reason->hs_wakeup_reason : 0);
+ done:
+ 	if (ret != MLAN_STATUS_PENDING)
+ 		kfree(req);
+--- a/mlinux/moal_main.c
++++ b/mlinux/moal_main.c
+@@ -9949,6 +9949,9 @@
+ module_param(max_nan_bss, int, 0);
+ MODULE_PARM_DESC(max_nan_bss, "Number of NAN interfaces (1)");
+ #ifdef DEBUG_LEVEL1
++bool diagnostic;
++module_param(diagnostic, bool, 0644);
++MODULE_PARM_DESC(diagnostic, "RP1 resume diagnostics (default off)");
+ module_param(drvdbg, uint, 0660);
+ MODULE_PARM_DESC(drvdbg, "Driver debug");
+ #endif /* DEBUG_LEVEL1 */
+--- a/mlinux/moal_main.h
++++ b/mlinux/moal_main.h
+@@ -1795,6 +1795,11 @@
+ /** Debug Macro definition*/
+ #ifdef	DEBUG_LEVEL1
+ extern t_u32 drvdbg;
++extern bool diagnostic;
++/* Independent of drvdbg; no packet contents or addresses are recorded. */
++#define RP1_DIAG(fmt, args...) do { \
++	if (diagnostic) printk(KERN_INFO "rp1diag: " fmt, ##args); \
++} while (0)
+ 
+ #define LOG_CTRL(level)     (0)
+ 
+--- a/mlinux/moal_shim.c
++++ b/mlinux/moal_shim.c
+@@ -587,6 +587,8 @@
+ 	moal_private *priv = NULL;
+ 	wait_queue *wait;
+ 	unsigned long flags = 0;
++	t_u32 diag_id, diag_sub, diag_code;
++	int diag_attached, diag_timed = 0;
+ 	ENTER();
+ 
+ 	if (!atomic_read(&handle->ioctl_pending))
+@@ -617,20 +619,24 @@
+ 		       status, pioctl_req->status_code);
+ 
+ 	spin_lock_irqsave(&handle->driver_lock, flags);
++	/* Snapshot before wake: the waiting owner may immediately free req. */
++	diag_id = pioctl_req->req_id;
++	diag_sub = *(t_u32 *)pioctl_req->pbuf;
++	diag_code = pioctl_req->status_code;
+ 	wait = (wait_queue *)pioctl_req->reserved_1;
++	diag_attached = !!wait;
+ 	if (wait) {
++		diag_timed = wait->wait_timeout;
+ 		wait->condition = MTRUE;
+ 		wait->status = status;
+ 		if (wait->wait_timeout) {
+ 			wake_up(&wait->wait);
+ 		} else {
++			/* Errors complete the wait too, including CMD_TIMEOUT. */
+ 			if ((status != MLAN_STATUS_SUCCESS) &&
+-			    (pioctl_req->status_code ==
+-			     MLAN_ERROR_CMD_TIMEOUT)) {
++			    (pioctl_req->status_code == MLAN_ERROR_CMD_TIMEOUT))
+ 				PRINTM(MERROR, "IOCTL: command timeout\n");
+-			} else {
+-				wake_up_interruptible(&wait->wait);
+-			}
++			wake_up_interruptible(&wait->wait);
+ 		}
+ 		spin_unlock_irqrestore(&handle->driver_lock, flags);
+ 	} else {
+@@ -640,6 +646,12 @@
+ 			woal_process_ioctl_resp(priv, pioctl_req);
+ 		kfree(pioctl_req);
+ 	}
++	if ((diag_id == MLAN_IOCTL_PM_CFG &&
++	     diag_sub == MLAN_OID_PM_HS_WAKEUP_REASON) ||
++	    status == MLAN_STATUS_FAILURE)
++		RP1_DIAG("IOCTL_COMPLETE id=%x sub=%x status=%d code=%x attached=%d timed=%d\n",
++			 (unsigned)diag_id, (unsigned)diag_sub, status,
++			 (unsigned)diag_code, diag_attached, diag_timed);
+ 	LEAVE();
+ 	return MLAN_STATUS_SUCCESS;
+ }
+@@ -2554,7 +2566,8 @@
+ 				DBG_HEXDUMP(MEVT_D, (char *)pformat, buf, len);
+ 		}
+ 	} else {
+-		if (drvdbg & level) {
++		/* Level zero is reserved for bounded RP1 diagnostic records. */
++		if ((!level && diagnostic) || (drvdbg & level)) {
+ 			va_start(args, pformat);
+ 			vprintk(pformat, args);
+ 			va_end(args);
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -4597,7 +4597,8 @@
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 11, 0) && defined(CONFIG_PM)
+ 	struct cfg80211_wowlan_wakeup wakeup_report;
+ #endif
+-	mlan_ds_hs_wakeup_reason wakeup_reason;
++	mlan_ds_hs_wakeup_reason wakeup_reason = { 0 };
++	mlan_status query_status;
+ 	int i;
+ 
+ 	PRINTM(MCMND, "<--- Enter woal_cfg80211_resume --->\n");
+@@ -4641,7 +4642,14 @@
+ 		}
+ 	}
+ 
+-	woal_get_wakeup_reason(priv, &wakeup_reason);
++	if (!priv)
++		goto resume_done;
++	query_status = woal_get_wakeup_reason(priv, &wakeup_reason);
++	if (query_status != MLAN_STATUS_SUCCESS) {
++		RP1_DIAG("RESUME_QUERY_FAILED status=%d; continuing resume\n",
++			 query_status);
++		goto resume_done;
++	}
+ 
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 11, 0) && defined(CONFIG_PM)
+ 	memset(&wakeup_report, 0, sizeof(struct cfg80211_wowlan_wakeup));
+@@ -4689,7 +4697,9 @@
+ 	}
+ #endif
+ 
++resume_done:
+ 	handle->cfg80211_suspend = MFALSE;
++	RP1_DIAG("RESUME_DONE\n");
+ 	PRINTM(MCMND, "<--- Leave woal_cfg80211_resume --->\n");
+ 	return 0;
+ }

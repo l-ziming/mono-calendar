@@ -1,0 +1,8 @@
+.build/
+source/wlan_src/**/*.o
+source/wlan_src/**/*.ko
+source/wlan_src/**/*.mod.c
+source/wlan_src/**/.*.cmd
+source/wlan_src/**/.tmp_versions/
+source/wlan_src/Module.symvers
+source/wlan_src/modules.order

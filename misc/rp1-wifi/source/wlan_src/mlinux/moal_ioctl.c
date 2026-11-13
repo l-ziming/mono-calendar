@@ -367,6 +367,9 @@ woal_wait_ioctl_complete(moal_private *priv, mlan_ioctl_req *req,
 	mlan_status status;
 	wait_queue *wait = (wait_queue *)req->reserved_1;
 	unsigned long flags;
+	t_u32 diag_id, diag_sub, diag_code;
+	unsigned long elapsed;
+	int completed, retries;
 
 	ENTER();
 
@@ -388,6 +391,14 @@ woal_wait_ioctl_complete(moal_private *priv, mlan_ioctl_req *req,
 		break;
 	}
 	spin_lock_irqsave(&priv->phandle->driver_lock, flags);
+	/* req and wait share an allocation. Detaching permits late completion
+	 * to free both, so never dereference them after unlocking below. */
+	diag_id = req->req_id;
+	diag_sub = *(t_u32 *)req->pbuf;
+	diag_code = req->status_code;
+	elapsed = jiffies_to_msecs(jiffies - wait->start_time);
+	completed = wait->condition;
+	retries = wait->retry;
 	if (wait->condition == MFALSE) {
 		if (wait_option == MOAL_IOCTL_WAIT_TIMEOUT) {
 			priv->phandle->ioctl_timeout = MTRUE;
@@ -407,6 +418,12 @@ woal_wait_ioctl_complete(moal_private *priv, mlan_ioctl_req *req,
 		status = wait->status;
 	}
 	spin_unlock_irqrestore(&priv->phandle->driver_lock, flags);
+	if ((diag_id == MLAN_IOCTL_PM_CFG &&
+	     diag_sub == MLAN_OID_PM_HS_WAKEUP_REASON) || !completed)
+		RP1_DIAG("WAIT_DONE id=%x sub=%x option=%u completed=%d status=%d code=%x elapsed_ms=%lu retries=%d detached=%d\n",
+			 (unsigned)diag_id, (unsigned)diag_sub, wait_option,
+			 completed, status, (unsigned)diag_code, elapsed,
+			 retries, !completed);
 
 	LEAVE();
 	return status;
@@ -2467,11 +2484,17 @@ woal_get_wakeup_reason(moal_private *priv,
 	req->action = MLAN_ACT_GET;
 
 	/* Send IOCTL request to MLAN */
+	RP1_DIAG("WAKE_QUERY_BEGIN timeout_ms=%u\n",
+		 (unsigned)jiffies_to_msecs(MOAL_IOCTL_TIMEOUT));
 	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT_TIMEOUT);
 	if (ret == MLAN_STATUS_SUCCESS) {
 		wakeup_reason->hs_wakeup_reason =
 			pmcfg->param.wakeup_reason.hs_wakeup_reason;
 	}
+	/* PENDING transfers ownership; only local ret/output are safe here. */
+	RP1_DIAG("WAKE_QUERY_END status=%d reason=%u\n", ret,
+		 ret == MLAN_STATUS_SUCCESS ?
+		 (unsigned)wakeup_reason->hs_wakeup_reason : 0);
 done:
 	if (ret != MLAN_STATUS_PENDING)
 		kfree(req);

@@ -37,6 +37,11 @@ extern mlan_status (*get_sys_time_callback) (IN t_void *pmoal_handle,
 					     OUT t_u32 *psec, OUT t_u32 *pusec);
 
 extern t_u32 mlan_drvdbg;
+/* Level zero bypasses drvdbg only when MOAL's diagnostic switch is on. */
+#define RP1_DIAG(fmt, args...) do { \
+	if (print_callback) \
+		print_callback(MNULL, 0, "rp1diag: " fmt, ##args); \
+} while (0)
 
 /* Reason Code 3: STA is leaving (or has left) IBSS or ESS */
 #define DEF_DEAUTH_REASON_CODE (0x3)

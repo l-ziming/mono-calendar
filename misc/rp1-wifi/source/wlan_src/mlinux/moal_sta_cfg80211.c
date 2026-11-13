@@ -4597,7 +4597,8 @@ woal_cfg80211_resume(struct wiphy *wiphy)
 #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 11, 0) && defined(CONFIG_PM)
 	struct cfg80211_wowlan_wakeup wakeup_report;
 #endif
-	mlan_ds_hs_wakeup_reason wakeup_reason;
+	mlan_ds_hs_wakeup_reason wakeup_reason = { 0 };
+	mlan_status query_status;
 	int i;
 
 	PRINTM(MCMND, "<--- Enter woal_cfg80211_resume --->\n");
@@ -4641,7 +4642,14 @@ woal_cfg80211_resume(struct wiphy *wiphy)
 		}
 	}
 
-	woal_get_wakeup_reason(priv, &wakeup_reason);
+	if (!priv)
+		goto resume_done;
+	query_status = woal_get_wakeup_reason(priv, &wakeup_reason);
+	if (query_status != MLAN_STATUS_SUCCESS) {
+		RP1_DIAG("RESUME_QUERY_FAILED status=%d; continuing resume\n",
+			 query_status);
+		goto resume_done;
+	}
 
 #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 11, 0) && defined(CONFIG_PM)
 	memset(&wakeup_report, 0, sizeof(struct cfg80211_wowlan_wakeup));
@@ -4689,7 +4697,9 @@ woal_cfg80211_resume(struct wiphy *wiphy)
 	}
 #endif
 
+resume_done:
 	handle->cfg80211_suspend = MFALSE;
+	RP1_DIAG("RESUME_DONE\n");
 	PRINTM(MCMND, "<--- Leave woal_cfg80211_resume --->\n");
 	return 0;
 }

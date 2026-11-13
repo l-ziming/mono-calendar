@@ -587,6 +587,8 @@ moal_ioctl_complete(IN t_void *pmoal_handle,
 	moal_private *priv = NULL;
 	wait_queue *wait;
 	unsigned long flags = 0;
+	t_u32 diag_id, diag_sub, diag_code;
+	int diag_attached, diag_timed = 0;
 	ENTER();
 
 	if (!atomic_read(&handle->ioctl_pending))
@@ -617,20 +619,24 @@ moal_ioctl_complete(IN t_void *pmoal_handle,
 		       status, pioctl_req->status_code);
 
 	spin_lock_irqsave(&handle->driver_lock, flags);
+	/* Snapshot before wake: the waiting owner may immediately free req. */
+	diag_id = pioctl_req->req_id;
+	diag_sub = *(t_u32 *)pioctl_req->pbuf;
+	diag_code = pioctl_req->status_code;
 	wait = (wait_queue *)pioctl_req->reserved_1;
+	diag_attached = !!wait;
 	if (wait) {
+		diag_timed = wait->wait_timeout;
 		wait->condition = MTRUE;
 		wait->status = status;
 		if (wait->wait_timeout) {
 			wake_up(&wait->wait);
 		} else {
+			/* Errors complete the wait too, including CMD_TIMEOUT. */
 			if ((status != MLAN_STATUS_SUCCESS) &&
-			    (pioctl_req->status_code ==
-			     MLAN_ERROR_CMD_TIMEOUT)) {
+			    (pioctl_req->status_code == MLAN_ERROR_CMD_TIMEOUT))
 				PRINTM(MERROR, "IOCTL: command timeout\n");
-			} else {
-				wake_up_interruptible(&wait->wait);
-			}
+			wake_up_interruptible(&wait->wait);
 		}
 		spin_unlock_irqrestore(&handle->driver_lock, flags);
 	} else {
@@ -640,6 +646,12 @@ moal_ioctl_complete(IN t_void *pmoal_handle,
 			woal_process_ioctl_resp(priv, pioctl_req);
 		kfree(pioctl_req);
 	}
+	if ((diag_id == MLAN_IOCTL_PM_CFG &&
+	     diag_sub == MLAN_OID_PM_HS_WAKEUP_REASON) ||
+	    status == MLAN_STATUS_FAILURE)
+		RP1_DIAG("IOCTL_COMPLETE id=%x sub=%x status=%d code=%x attached=%d timed=%d\n",
+			 (unsigned)diag_id, (unsigned)diag_sub, status,
+			 (unsigned)diag_code, diag_attached, diag_timed);
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
@@ -2554,7 +2566,8 @@ moal_print(IN t_void *pmoal_handle, IN t_u32 level, IN char *pformat, IN ...)
 				DBG_HEXDUMP(MEVT_D, (char *)pformat, buf, len);
 		}
 	} else {
-		if (drvdbg & level) {
+		/* Level zero is reserved for bounded RP1 diagnostic records. */
+		if ((!level && diagnostic) || (drvdbg & level)) {
 			va_start(args, pformat);
 			vprintk(pformat, args);
 			va_end(args);

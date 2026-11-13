@@ -3627,7 +3627,7 @@ woal_priv_getwakeupreason(moal_private *priv, t_u8 *respbuf, t_u32 respbuflen)
 		req->req_id = MLAN_IOCTL_PM_CFG;
 		req->action = MLAN_ACT_GET;
 
-		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT_TIMEOUT);
 		if (status != MLAN_STATUS_SUCCESS) {
 			ret = -EFAULT;
 			if (status != MLAN_STATUS_PENDING)

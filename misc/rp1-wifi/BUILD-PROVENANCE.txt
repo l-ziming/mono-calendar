@@ -1,0 +1,45 @@
+Local macOS ARMv7 RP1 driver build
+
+Toolchain: official AOSP Darwin x86_64 arm-linux-androideabi GCC 4.8,
+Android android-5.1.1_r38 tag, executed under Rosetta on this Apple Silicon Mac.
+URL: https://android.googlesource.com/platform/prebuilts/gcc/darwin-x86/arm/arm-linux-androideabi-4.8/+archive/refs/tags/android-5.1.1_r38.tar.gz
+Archive SHA256: 263e726adf803ddccf55ced75df5e3af4c50ea4a86cf570e872217d395f27daa
+Current temporary extraction: /tmp/rp1-wifi-driver-build/aosp-gcc48
+
+Rebuild after /tmp deletion:
+  ./build-driver.sh > build.log 2>&1
+The script downloads and SHA256-verifies that official toolchain into .build/aosp-gcc48 when absent, prepares headers in .build/kernel, and builds source/wlan_src. No global installation and no device access.
+
+Reuse already downloaded toolchain/headers instead:
+  RP1_TOOLCHAIN_DIR=/tmp/rp1-wifi-driver-build/aosp-gcc48 RP1_BUILD_DIR=/tmp/rp1-wifi-driver-build/kernel-build ./build-driver.sh > build.log 2>&1
+RP1_KERNEL_SOURCE may override the existing Sony source directory.
+
+Sony kernel source used:
+  ../rp1-kernel-20261110-live/source/linux-3.14.35
+Official Sony OSS page:
+  https://oss.sony.net/Products/Linux/dp/DPT-RP1_DPT-CP1_Ver1.6.02.html
+The parent package linux-3.14.35.tar.gz is retained in rp1-kernel-20261110-live.
+Driver base: its drivers/marvell/sd8897/wlan_src, C509.p2.
+Stock driver: C509, extracted from the device.
+
+build-support/kernel.config is copied byte-for-byte from the device config:
+SHA256 789211b4b1e83449491c818368664ec887f9cfce4bca134b409d56492979cf85
+The script requires olddefconfig to preserve it exactly.
+
+Host ELF header: local retained copy of official musl include/elf.h fetched from
+https://git.musl-libc.org/cgit/musl/plain/include/elf.h
+Retained file SHA256: d62fe51eb318a17d5d6a6669172eb7ba522dad03698a9b521265af3b6b23b489
+This permits host modpost to build on macOS. Host tools use Apple clang -arch x86_64 and -Wl,-no_pie, which avoids arm64 Mach-O text relocation failures in old file2alias.c. Sony kernel source stays read-only; only external O= output and copied driver generate build files.
+
+Critical target flags:
+-fno-pic -fno-pie MUST appear in the CC command itself, not only KCFLAGS.
+AOSP GCC defaults to PIC: otherwise gcc-goto.sh fails, CC_HAVE_ASM_GOTO is omitted, and struct module wrongly shrinks from 0x178 to 0x170. PIC also creates GOT relocations unsupported by this kernel loader.
+NDK clang18 is unsuitable without additional kernel header changes: local register asm("sp") used by current_thread_info is miscompiled. Do not deploy clang baseline artifacts.
+
+Baseline static checks:
+Both vermagic: 3.14.35 SMP preempt mod_unload ARMv7
+Both .gnu.linkonce.this_module: 0x178 (stock matches)
+14 MLAN exports, kernel imports, and 61 stock parameters match.
+Stock sd8897 depends=mlan8777; external pair depends=mlan8897. Use actual /proc/modules names when unloading and load the new matching pair together.
+Missing full-kernel Module.symvers is expected with CONFIG_MODVERSIONS=n; static imports were separately checked against stock and device __ksymtab.
+No device operations are performed by the script.

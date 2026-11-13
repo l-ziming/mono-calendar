@@ -625,6 +625,12 @@ wlan_wakeup_card_timeout_func(void *function_context)
 
 	ENTER();
 
+	RP1_DIAG("FW_WAKE_TIMEOUT ps=%u wake_req=%u wake_try=%u current=%u cmd_timer=%u last_cmd=%x last_resp=%x\n",
+		 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
+		 pmadapter->pm_wakeup_fw_try, pmadapter->curr_cmd != MNULL,
+		 pmadapter->cmd_timer_is_set,
+		 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
+		 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index]);
 	PRINTM(MERROR, "%s: ps_state=%d\n", __FUNCTION__, pmadapter->ps_state);
 	if (pmadapter->ps_state != PS_STATE_AWAKE) {
 		PRINTM(MERROR, "Wakeup card timeout!\n");
@@ -670,6 +676,8 @@ wlan_pm_wakeup_card(IN pmlan_adapter pmadapter, IN t_u8 timeout)
 		ret = pcb->moal_write_reg(pmadapter->pmoal_handle,
 					  HOST_TO_CARD_EVENT_REG,
 					  HOST_POWER_UP);
+	RP1_DIAG("FW_WAKE_REQUEST ps=%u timeout=%u status=%d\n",
+		 pmadapter->ps_state, timeout, ret);
 	LEAVE();
 	return ret;
 }

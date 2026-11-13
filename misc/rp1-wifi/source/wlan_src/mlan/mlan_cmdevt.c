@@ -921,6 +921,11 @@ wlan_dnld_cmd_to_fw(IN mlan_private *pmpriv, IN cmd_ctrl_node *pcmd_node)
 				  pcmd_node->priv->bss_type));
 	cmd_code = wlan_le16_to_cpu(pcmd->command);
 	cmd_size = wlan_le16_to_cpu(pcmd->size);
+	if ((cmd_code & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
+		RP1_DIAG("SEND_BEGIN cmd=%x seq=%x ps=%u wake_req=%u wake_try=%u\n",
+			 cmd_code, wlan_le16_to_cpu(pcmd->seq_num),
+			 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
+			 pmadapter->pm_wakeup_fw_try);
 
 	pcmd_node->cmdbuf->data_len = cmd_size;
 
@@ -954,6 +959,8 @@ wlan_dnld_cmd_to_fw(IN mlan_private *pmpriv, IN cmd_ctrl_node *pcmd_node)
 	/* Extra header for SDIO is added here */
 	ret = wlan_sdio_host_to_card(pmadapter, MLAN_TYPE_CMD,
 				     pcmd_node->cmdbuf, MNULL);
+	if ((cmd_code & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
+		RP1_DIAG("SEND_END cmd=%x status=%d\n", cmd_code, ret);
 
 	if (ret == MLAN_STATUS_FAILURE) {
 		PRINTM(MERROR, "DNLD_CMD: Host to Card Failed\n");
@@ -1564,6 +1571,14 @@ wlan_insert_cmd_to_pending_q(IN mlan_adapter *pmadapter,
 				      pcmd_node->cmdbuf->data_offset);
 
 	command = wlan_le16_to_cpu(pcmd->command);
+	if ((command & HostCmd_CMD_ID_MASK) == HostCmd_CMD_HS_WAKEUP_REASON)
+		RP1_DIAG("QUEUE cmd=%x ps=%u wake_req=%u wake_try=%u current=%u cmd_timer=%u last_cmd=%x last_resp=%x hw=%u\n",
+			 command, pmadapter->ps_state,
+			 pmadapter->pm_wakeup_card_req, pmadapter->pm_wakeup_fw_try,
+			 pmadapter->curr_cmd != MNULL, pmadapter->cmd_timer_is_set,
+			 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
+			 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index],
+			 pmadapter->hw_status);
 
 	/* Exit_PS command needs to be queued in the header always. */
 	if (command == HostCmd_CMD_802_11_PS_MODE_ENH) {
@@ -1769,6 +1784,9 @@ wlan_process_cmdresp(mlan_adapter *pmadapter)
 	cmdresp_no = resp->command;
 
 	cmdresp_result = resp->result;
+	if (cmdresp_no == HostCmd_CMD_HS_WAKEUP_REASON)
+		RP1_DIAG("RESPONSE cmd=%x seq=%x result=%u\n",
+			 orig_cmdresp_no, resp->seq_num, cmdresp_result);
 
 	/* Save the last command response to debug log */
 	pmadapter->dbg.last_cmd_resp_index =
@@ -1906,6 +1924,11 @@ wlan_cmd_timeout_func(t_void *function_context)
 	ENTER();
 
 	pmadapter->cmd_timer_is_set = MFALSE;
+	RP1_DIAG("CMD_TIMEOUT ps=%u wake_req=%u wake_try=%u current=%u last_cmd=%x last_resp=%x\n",
+		 pmadapter->ps_state, pmadapter->pm_wakeup_card_req,
+		 pmadapter->pm_wakeup_fw_try, pmadapter->curr_cmd != MNULL,
+		 pmadapter->dbg.last_cmd_id[pmadapter->dbg.last_cmd_index],
+		 pmadapter->dbg.last_cmd_resp_id[pmadapter->dbg.last_cmd_resp_index]);
 	if (!pmadapter->curr_cmd) {
 		PRINTM(MWARN, "CurCmd Empty\n");
 		goto exit;
