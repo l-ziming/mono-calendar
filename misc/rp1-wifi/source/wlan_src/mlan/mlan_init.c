@@ -611,6 +611,8 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 
 	/* PnP and power profile */
 	pmadapter->surprise_removed = MFALSE;
+	/* FW hang report */
+	pmadapter->fw_hang_report = MFALSE;
 
 	if (!pmadapter->init_para.ps_mode) {
 		pmadapter->ps_mode = DEFAULT_PS_MODE;
@@ -1090,6 +1092,15 @@ wlan_init_timer(IN pmlan_adapter pmadapter)
 		ret = MLAN_STATUS_FAILURE;
 		goto error;
 	}
+	if (pcb->
+	    moal_init_timer(pmadapter->pmoal_handle,
+			    &pmadapter->pwakeup_fw_timer,
+			    wlan_wakeup_card_timeout_func, pmadapter)
+	    != MLAN_STATUS_SUCCESS) {
+		ret = MLAN_STATUS_FAILURE;
+		goto error;
+	}
+	pmadapter->wakeup_fw_timer_is_set = MFALSE;
 error:
 	LEAVE();
 	return ret;
@@ -1112,6 +1123,10 @@ wlan_free_timer(IN pmlan_adapter pmadapter)
 	if (pmadapter->pmlan_cmd_timer)
 		pcb->moal_free_timer(pmadapter->pmoal_handle,
 				     pmadapter->pmlan_cmd_timer);
+
+	if (pmadapter->pwakeup_fw_timer)
+		pcb->moal_free_timer(pmadapter->pmoal_handle,
+				     pmadapter->pwakeup_fw_timer);
 
 	LEAVE();
 	return;
@@ -1360,6 +1375,12 @@ wlan_free_adapter(pmlan_adapter pmadapter)
 		pcb->moal_stop_timer(pmadapter->pmoal_handle,
 				     pmadapter->pmlan_cmd_timer);
 		pmadapter->cmd_timer_is_set = MFALSE;
+	}
+	if (pmadapter->wakeup_fw_timer_is_set) {
+		/* Cancel wakeup card timer */
+		pcb->moal_stop_timer(pmadapter->pmoal_handle,
+				     pmadapter->pwakeup_fw_timer);
+		pmadapter->wakeup_fw_timer_is_set = MFALSE;
 	}
 #ifdef STA_SUPPORT
 	PRINTM(MINFO, "Free ScanTable\n");

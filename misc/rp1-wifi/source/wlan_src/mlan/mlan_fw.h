@@ -1599,6 +1599,8 @@ typedef enum _ENH_PS_MODES {
 
 #define EVENT_EXCEED_MAX_P2P_CONN     0x00000089
 
+#define EVENT_FW_HANG_REPORT     0x0000008F
+
 #define EVENT_FW_DUMP_INFO      0x00000073
 /** Event ID mask */
 #define EVENT_ID_MASK                   0xffff

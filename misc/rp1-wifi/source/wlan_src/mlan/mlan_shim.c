@@ -1068,7 +1068,7 @@ process_start:
 		     || !wlan_bypass_tx_list_empty(pmadapter)
 		     || !wlan_wmm_lists_empty(pmadapter)
 		    )) {
-			wlan_pm_wakeup_card(pmadapter);
+			wlan_pm_wakeup_card(pmadapter, MTRUE);
 			pmadapter->pm_wakeup_fw_try = MTRUE;
 			continue;
 		}
@@ -1084,6 +1084,12 @@ process_start:
 			pmadapter->pm_wakeup_fw_try = MFALSE;
 			if (pmadapter->ps_state == PS_STATE_SLEEP)
 				pmadapter->ps_state = PS_STATE_AWAKE;
+			if (pmadapter->wakeup_fw_timer_is_set) {
+				pcb->moal_stop_timer(pmadapter->pmoal_handle,
+						     pmadapter->
+						     pwakeup_fw_timer);
+				pmadapter->wakeup_fw_timer_is_set = MFALSE;
+			}
 		} else {
 			/* We have tried to wakeup the card already */
 			if (pmadapter->pm_wakeup_fw_try)
@@ -1396,7 +1402,7 @@ mlan_pm_wakeup_card(IN t_void *adapter)
 {
 	mlan_adapter *pmadapter = (mlan_adapter *)adapter;
 	ENTER();
-	wlan_pm_wakeup_card(pmadapter);
+	wlan_pm_wakeup_card(pmadapter, MFALSE);
 	LEAVE();
 }
 

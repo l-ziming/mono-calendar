@@ -370,6 +370,8 @@ do {                                    \
 #define MRVDRV_TIMER_10S                10000
 /** 5 seconds */
 #define MRVDRV_TIMER_5S                 5000
+/** 3 seconds */
+#define MRVDRV_TIMER_3S                 3000
 /** 1 second */
 #define MRVDRV_TIMER_1S                 1000
 
@@ -1877,6 +1879,8 @@ typedef struct _mlan_adapter {
 	WLAN_HARDWARE_STATUS hw_status;
     /** PnP SUPPORT */
 	t_u8 surprise_removed;
+    /** FW hang report */
+	t_u8 fw_hang_report;
 
     /** ECSA support */
 	t_u8 ecsa_enable;
@@ -2226,6 +2230,10 @@ typedef struct _mlan_adapter {
 	t_u32 pm_wakeup_fw_try;
     /** time stamp when host try to wake up firmware */
 	t_u32 pm_wakeup_in_secs;
+    /** Card wakeup timer */
+	t_void *pwakeup_fw_timer;
+    /** Card wakeup timer */
+	t_u8 wakeup_fw_timer_is_set;
 
     /** Host Sleep configured flag */
 	t_u8 is_hs_configured;
@@ -2550,7 +2558,8 @@ void wlan_process_sleep_confirm_resp(pmlan_adapter pmadapter, t_u8 *pbuf,
 void wlan_process_hs_config(pmlan_adapter pmadapter);
 
 mlan_status wlan_pm_reset_card(pmlan_adapter adapter);
-mlan_status wlan_pm_wakeup_card(pmlan_adapter pmadapter);
+mlan_status wlan_pm_wakeup_card(pmlan_adapter pmadapter, t_u8 timeout);
+t_void wlan_wakeup_card_timeout_func(void *function_context);
 
 mlan_status wlan_process_802dot11_mgmt_pkt(mlan_private *priv, t_u8 *payload,
 					   t_u32 payload_len, RxPD *prx_pd);

@@ -142,6 +142,10 @@ parse_arguments(t_u8 *pos, int *data, int datalen, int *user_data_len)
 			if (pos[i] == '\0')
 				break;
 		} else {
+			if (k >= sizeof(cdata)) {
+				PRINTM(MERROR, "Invalid numerical arguments\n");
+				break;
+			}
 			cdata[k] = pos[i];
 			k++;
 		}

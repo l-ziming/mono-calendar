@@ -550,6 +550,7 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 					 pmadapter->callbacks.moal_spin_unlock);
 		debug_info->num_drop_pkts = pmpriv->num_drop_pkts;
 #endif
+		debug_info->fw_hang_report = pmadapter->fw_hang_report;
 		debug_info->mlan_processing = pmadapter->mlan_processing;
 		debug_info->mlan_rx_processing = pmadapter->mlan_rx_processing;
 		debug_info->rx_pkts_queued = pmadapter->rx_pkts_queued;
@@ -612,14 +613,39 @@ wlan_misc_ioctl_mac_control(IN pmlan_adapter pmadapter,
 }
 
 /**
+ *  @brief This timer function handles wakeup card timeout.
+ *
+ *  @param function_context   A pointer to function_context
+ *  @return        N/A
+ */
+t_void
+wlan_wakeup_card_timeout_func(void *function_context)
+{
+	pmlan_adapter pmadapter = (pmlan_adapter)function_context;
+
+	ENTER();
+
+	PRINTM(MERROR, "%s: ps_state=%d\n", __FUNCTION__, pmadapter->ps_state);
+	if (pmadapter->ps_state != PS_STATE_AWAKE) {
+		PRINTM(MERROR, "Wakeup card timeout!\n");
+		wlan_recv_event(wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY),
+				MLAN_EVENT_ID_DRV_DBG_DUMP, MNULL);
+	}
+	pmadapter->wakeup_fw_timer_is_set = MFALSE;
+
+	LEAVE();
+}
+
+/**
  *  @brief This function wakes up the card.
  *
  *  @param pmadapter		A pointer to mlan_adapter structure
+ *  @param timeout          set timeout flag
  *
  *  @return			MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
-wlan_pm_wakeup_card(IN pmlan_adapter pmadapter)
+wlan_pm_wakeup_card(IN pmlan_adapter pmadapter, IN t_u8 timeout)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u32 age_ts_usec;
@@ -631,6 +657,13 @@ wlan_pm_wakeup_card(IN pmlan_adapter pmadapter)
 						  &pmadapter->pm_wakeup_in_secs,
 						  &age_ts_usec);
 
+	if (timeout) {
+		pmadapter->callbacks.moal_start_timer(pmadapter->pmoal_handle,
+						      pmadapter->
+						      pwakeup_fw_timer, MFALSE,
+						      MRVDRV_TIMER_3S);
+		pmadapter->wakeup_fw_timer_is_set = MTRUE;
+	}
 	if (pmadapter->fw_wakeup_method == WAKEUP_FW_THRU_GPIO) {
 		/* GPIO_PORT_TO_LOW(); */
 	} else

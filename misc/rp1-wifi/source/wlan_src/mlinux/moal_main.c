@@ -4608,6 +4608,12 @@ woal_check_driver_status(moal_handle *handle)
 	ENTER();
 
 	priv = woal_get_priv(handle, MLAN_BSS_ROLE_ANY);
+	/* Add for watch dog reboot */
+	if (priv && priv->phandle->driver_state) {
+		LEAVE();
+		return MTRUE;
+	}
+	/*End */
 	if (!priv || woal_get_debug_info(priv, MOAL_IOCTL_WAIT, &info)) {
 		PRINTM(MERROR,
 		       "Could not retrieve debug information from MLAN\n");
@@ -4670,6 +4676,11 @@ woal_check_driver_status(moal_handle *handle)
 			LEAVE();
 			return MTRUE;
 		}
+	}
+	if (info.fw_hang_report) {
+		PRINTM(MERROR, "fw_hang_report = %d\n", info.fw_hang_report);
+		LEAVE();
+		return MTRUE;
 	}
 	LEAVE();
 	return MFALSE;

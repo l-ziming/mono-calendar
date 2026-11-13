@@ -2132,6 +2132,8 @@ typedef struct _mlan_debug_info {
     /**  dropped pkts */
 	t_u32 num_drop_pkts;
 #endif
+    /** FW hang report */
+	t_u8 fw_hang_report;
     /** mlan_adapter pointer */
 	t_void *mlan_adapter;
     /** mlan_adapter_size */

@@ -2460,8 +2460,9 @@ wlan_process_hs_config(pmlan_adapter pmadapter)
 {
 	ENTER();
 	PRINTM(MINFO, "Recevie interrupt/data in HS mode\n");
-	if (pmadapter->hs_cfg.gap == HOST_SLEEP_CFG_GAP_FF)
-		wlan_pm_wakeup_card(pmadapter);
+	if (pmadapter->hs_cfg.gap == HOST_SLEEP_CFG_GAP_FF) {
+		wlan_pm_wakeup_card(pmadapter, MTRUE);
+	}
 	LEAVE();
 	return;
 }
