@@ -41,7 +41,7 @@ deploy/
   home-assistant/  HA packages 模板（便条实体、新闻邮件）
   standalone/      不使用 HA Apps 时的部署
 docs/              文档
-misc/              RP1 驱动备份与补丁
+misc/              RP1 驱动补丁与菜单图标
 scripts/           构建、检查、RP1 配置与离线预览
 tests/             回归测试：ha-app/ 模拟 HA 与模型，android/ 屏幕端检查，fixtures/ 共用数据
 ```
