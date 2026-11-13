@@ -38,11 +38,14 @@ public final class SetupReceiver extends BroadcastReceiver {
             SharedPreferences preferences = context.getSharedPreferences("connection", Context.MODE_PRIVATE);
             boolean connectionChanged = !endpoint.equals(preferences.getString("endpoint", ""))
                 || !token.equals(preferences.getString("token", ""));
+            boolean scheduled = intent.getBooleanExtra("scheduled", true);
             SharedPreferences.Editor editor = preferences.edit()
                                                   .putString("endpoint", endpoint)
                                                   .putString("token", token)
-                                                  .putBoolean("scheduled", intent.getBooleanExtra("scheduled", true))
+                                                  .putBoolean("scheduled", scheduled)
                                                   .putBoolean("exited", false);
+            if (connectionChanged || !scheduled)
+                editor.remove("hint_attempts").remove("hint_due");
             if (connectionChanged)
                 editor.putString("client", UUID.randomUUID().toString())
                     .putLong("last_data", 0)

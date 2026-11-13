@@ -420,6 +420,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (tz != null)
             e.putString("display_timezone", tz);
         e.apply();
+        WakeReceiver.updateHint(this, data);
         for (String n : requests.reconcile(data, SystemClock.elapsedRealtime()))
             setNotice(n);
         render(false);

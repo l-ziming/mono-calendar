@@ -36,6 +36,7 @@ if javac:
             str(project_root / 'android/src/dev/monocalendar/rp1' / filename)
             for filename in (
                 'QuarterClock.java',
+                'HintRetry.java',
                 'ConnectionSettings.java',
                 'Almanac.java',
                 'Json.java',
@@ -57,6 +58,7 @@ if javac:
                 classes_dir,
                 *sources,
                 str(project_root / 'tests/android/QuarterClockCheck.java'),
+                str(project_root / 'tests/android/HintRetryCheck.java'),
                 str(project_root / 'tests/android/AlmanacCheck.java'),
                 str(project_root / 'tests/android/WeatherCheck.java'),
                 str(project_root / 'tests/android/RemoteStateCheck.java'),
@@ -67,6 +69,7 @@ if javac:
         java_runner = str(Path(javac).with_name('java'))
         check_classes = [
             'QuarterClockCheck',
+            'HintRetryCheck',
             'AlmanacCheck',
             'dev.monocalendar.rp1.WeatherCheck',
             'RemoteStateCheck',
