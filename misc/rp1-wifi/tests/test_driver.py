@@ -85,6 +85,127 @@ class DriverChecks(unittest.TestCase):
             device.shell.assert_any_call('svc wifi disable')
             self.assertFalse((Path(directory) / 'result.json').exists())
 
+    def test_operation_error_survives_cleanup_failures(self):
+        for action in ('install', 'rollback'):
+            for readonly_failed, wifi_failed in ((True, False), (False, True), (True, True)):
+                with self.subTest(action=action, readonly_failed=readonly_failed, wifi_failed=wifi_failed):
+                    with tempfile.TemporaryDirectory() as directory:
+                        errors = io.StringIO()
+                        device = self.device(directory, wifi_enabled=False)
+                        original_error = RuntimeError('original operation failed')
+                        device.files.side_effect = [original_error, None]
+                        if readonly_failed:
+                            device.restore_system_protection.side_effect = RuntimeError('readonly restore failed')
+
+                        def shell(command):
+                            if wifi_failed and command == 'svc wifi disable':
+                                raise RuntimeError('wifi restore failed')
+                            return ''
+
+                        device.shell.side_effect = shell
+                        with redirect_stdout(io.StringIO()), redirect_stderr(errors):
+                            with self.assertRaises(RuntimeError) as caught:
+                                driver.change(device, action, {})
+
+                        self.assertIs(caught.exception, original_error)
+                        device.restore_system_protection.assert_called_once_with(device.status.return_value)
+                        device.shell.assert_any_call('svc wifi disable')
+                        if readonly_failed:
+                            self.assertIn('readonly restore failed', errors.getvalue())
+                        if wifi_failed:
+                            self.assertIn('wifi restore failed', errors.getvalue())
+                        self.assertFalse((Path(directory) / 'result.json').exists())
+
+    def test_successful_operation_reports_first_cleanup_error(self):
+        for readonly_failed in (False, True):
+            with self.subTest(readonly_failed=readonly_failed), tempfile.TemporaryDirectory() as directory:
+                errors = io.StringIO()
+                device = self.device(directory, wifi_enabled=False)
+                readonly_error = RuntimeError('readonly restore failed')
+                wifi_error = RuntimeError('wifi restore failed')
+                if readonly_failed:
+                    device.restore_system_protection.side_effect = readonly_error
+
+                def shell(command):
+                    if command == 'svc wifi disable':
+                        raise wifi_error
+                    return ''
+
+                device.shell.side_effect = shell
+                with redirect_stdout(io.StringIO()), redirect_stderr(errors):
+                    with self.assertRaises(RuntimeError) as caught:
+                        driver.change(device, 'install', {})
+
+                expected_error = wifi_error
+                if readonly_failed:
+                    expected_error = readonly_error
+                    self.assertIn('wifi restore failed', errors.getvalue())
+                self.assertIs(caught.exception, expected_error)
+                device.shell.assert_any_call('svc wifi disable')
+                self.assertFalse((Path(directory) / 'result.json').exists())
+
+    def test_rollback_error_survives_wifi_restart_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            errors = io.StringIO()
+            device = self.device(directory)
+            original_error = RuntimeError('rollback failed')
+            device.files.side_effect = original_error
+
+            def shell(command):
+                if command == 'svc wifi enable':
+                    raise RuntimeError('wifi restart failed')
+                return ''
+
+            device.shell.side_effect = shell
+            with redirect_stdout(io.StringIO()), redirect_stderr(errors):
+                with self.assertRaises(RuntimeError) as caught:
+                    driver.change(device, 'rollback', {})
+
+            self.assertIs(caught.exception, original_error)
+            self.assertIn('wifi restart failed', errors.getvalue())
+            device.restore_system_protection.assert_called_once_with(device.status.return_value)
+            self.assertFalse((Path(directory) / 'result.json').exists())
+
+    def test_cleanup_error_is_not_hidden_by_outer_exception_handler(self):
+        with tempfile.TemporaryDirectory() as directory:
+            device = self.device(directory)
+            cleanup_error = RuntimeError('readonly restore failed')
+            device.restore_system_protection.side_effect = cleanup_error
+
+            try:
+                raise RuntimeError('unrelated caller failure')
+            except RuntimeError:
+                with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                    with self.assertRaises(RuntimeError) as caught:
+                        driver.change(device, 'install', {})
+
+            self.assertIs(caught.exception, cleanup_error)
+            self.assertFalse((Path(directory) / 'result.json').exists())
+
+    def test_interrupt_survives_cleanup_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            errors = io.StringIO()
+            device = self.device(directory, wifi_enabled=False)
+            original_error = KeyboardInterrupt('interrupted')
+            device.files.side_effect = [original_error, None]
+            device.restore_system_protection.side_effect = RuntimeError('readonly restore failed')
+
+            def shell(command):
+                if command == 'svc wifi disable':
+                    raise RuntimeError('wifi restore failed')
+                return ''
+
+            device.shell.side_effect = shell
+            with redirect_stdout(io.StringIO()), redirect_stderr(errors):
+                with self.assertRaises(KeyboardInterrupt) as caught:
+                    driver.change(device, 'install', {})
+
+            self.assertIs(caught.exception, original_error)
+            self.assertIn('readonly restore failed', errors.getvalue())
+            self.assertIn('wifi restore failed', errors.getvalue())
+            device.shell.assert_any_call('svc wifi disable')
+            self.assertFalse((Path(directory) / 'result.json').exists())
+
     def test_legacy_adb_zero_exit_still_requires_remote_completion(self):
         device = object.__new__(driver.Device)
         device.run = Mock(return_value='remote command failed\n')

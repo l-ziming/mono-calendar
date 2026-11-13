@@ -202,6 +202,7 @@ def change(device, action, hashes):
     device.stage()
     # Refuse an unknown override before interrupting Wi-Fi.
     device.shell('sh ' + REMOTE + '/files.sh status')
+    primary_error = None
     try:
         device.stop_wifi()
         device.files(action)
@@ -216,24 +217,36 @@ def change(device, action, hashes):
             raise RuntimeError('system 块设备只读状态未恢复')
         if after['system_mount'] != before['system_mount']:
             raise RuntimeError('system 挂载状态未恢复')
-    except BaseException:
+    except BaseException as operation_error:
+        primary_error = operation_error
         if action == 'install':
             print('安装未完成，正在撤回优先目录并恢复原厂驱动。', file=sys.stderr, flush=True)
-            try:
+        try:
+            if action == 'install':
                 device.stop_wifi()
                 device.files('rollback')
                 device.start_wifi('C509')
-            except Exception as recovery_error:
-                print('自动恢复未完成，请保留 USB：' + str(recovery_error), file=sys.stderr)
-        else:
-            device.shell('svc wifi enable')
+            else:
+                device.shell('svc wifi enable')
+        except BaseException as recovery_error:
+            print('自动恢复未完成，请保留 USB：' + str(recovery_error), file=sys.stderr)
         raise
     finally:
         try:
             device.restore_system_protection(before)
+        except BaseException as protection_error:
+            if primary_error is None:
+                primary_error = protection_error
+                raise
+            print('恢复 system 只读失败，请保留 USB：' + str(protection_error), file=sys.stderr)
         finally:
             if not before['wifi_enabled']:
-                device.shell('svc wifi disable')
+                try:
+                    device.shell('svc wifi disable')
+                except BaseException as wifi_error:
+                    if primary_error is None:
+                        raise
+                    print('恢复 Wi-Fi 关闭状态失败：' + str(wifi_error), file=sys.stderr)
     record = {'action': action, 'after': after, 'boot_unchanged': True, 'original_modules_unchanged': True}
     (directory / 'result.json').write_text(json.dumps(record, indent=2, ensure_ascii=False) + '\n')
     print(json.dumps(record, indent=2, ensure_ascii=False))
