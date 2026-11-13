@@ -222,11 +222,101 @@ try {
     generated_at: now.toISOString(),
     expires_at: '2026-11-10T07:00:00Z',
   }; // 00:00 Denver
+  const beforeQuiet = structuredClone(expiring.writer.state.expiryCheck);
   assert.equal(await expiring.writer.tick(new Date('2026-11-10T07:00:00Z')), false);
-  assert.equal(await expiring.writer.tick(new Date('2026-11-10T13:00:00Z')), false);
+  assert.equal(await expiring.writer.tick(new Date('2026-11-10T12:59:00Z')), false);
+  assert.deepEqual(expiring.writer.state.expiryCheck, beforeQuiet, 'Quiet hours do not consume an expiry attempt');
   assert.equal(rechecks, 1, 'Quiet hours skip the expiry recheck');
+  assert.equal(await expiring.writer.tick(new Date('2026-11-10T13:00:00Z')), true);
+  assert.equal(rechecks, 2, 'An expiry skipped during quiet hours is checked after quiet hours end');
   expiring.writer.state.previous = { lines: [], generated_at: now.toISOString(), expires_at: now.toISOString() };
   assert.equal(await expiring.writer.tick(new Date('2026-11-10T17:00:00Z')), false, 'A cleared note needs no recheck');
+
+  const retryPath = join(directory, 'expiry-retry.json');
+  const retryConfig = { assistant_state_file: retryPath };
+  const retry = harness(retryConfig);
+  let failedChecks = 0;
+  const failCheck = async () => {
+    failedChecks++;
+    const persisted = JSON.parse(await readFile(retryPath, 'utf8')).expiryCheck;
+    assert.equal(persisted.attempts, Math.min(failedChecks, 3), 'The budget is saved before the model is called');
+    assert.equal(persisted.complete, false);
+    if (failedChecks === 2) throw new Error('temporary model failure');
+    return false;
+  };
+  retry.writer.state.previous = {
+    lines: valid,
+    generated_at: now.toISOString(),
+    expires_at: '2026-11-09T17:00:00Z',
+  };
+  retry.writer.setDecision(failCheck);
+  assert.equal(await retry.writer.tick(new Date('2026-11-09T17:00:00Z')), false);
+  const restartedRetry = harness(retryConfig);
+  await restartedRetry.writer.load();
+  restartedRetry.writer.setDecision(failCheck);
+  assert.equal(await restartedRetry.writer.tick(new Date('2026-11-09T17:04:59Z')), false);
+  assert.equal(failedChecks, 1, 'Restart does not reset the retry delay');
+  assert.equal(await restartedRetry.writer.tick(new Date('2026-11-09T17:05:00Z')), false);
+  assert.equal(await restartedRetry.writer.tick(new Date('2026-11-09T17:09:59Z')), false);
+  assert.equal(failedChecks, 2, 'A thrown model error also waits five minutes');
+  assert.equal(await restartedRetry.writer.tick(new Date('2026-11-09T17:10:00Z')), false);
+  assert.equal(await restartedRetry.writer.tick(new Date('2026-11-09T17:15:00Z')), false);
+  assert.equal(failedChecks, 3, 'One expiry gets at most three attempts');
+  const exhausted = harness(retryConfig);
+  await exhausted.writer.load();
+  exhausted.writer.setDecision(failCheck);
+  assert.equal(await exhausted.writer.tick(new Date('2026-11-09T18:00:00Z')), false);
+  assert.equal(failedChecks, 3, 'Restart does not reset an exhausted budget');
+  assert.equal(await exhausted.writer.tick(new Date('2026-11-10T15:00:00Z')), false);
+  assert.equal(failedChecks, 4, 'Configured screen slots remain independent of exhausted expiry retries');
+
+  for (const operation of ['keep', 'clear']) {
+    const handled = harness({ assistant_screen_min_minutes: 0 });
+    const expiresAt = '2026-11-09T17:00:00Z';
+    handled.writer.state.previous = { lines: handled.snapshot().lines, expires_at: expiresAt };
+    if (operation === 'keep') handled.current = { state: '', last_changed: now.toISOString() };
+    let handledChecks = 0;
+    handled.writer.setDecision(async (trigger, at) => {
+      handledChecks++;
+      const result = await handled.writer.publish(
+        { action: operation, lines: [], expires_at: null, base_version: handled.snapshot().version },
+        { now: at },
+      );
+      assert.ok(['kept', 'cleared'].includes(result.status));
+      return true;
+    });
+    assert.equal(await handled.writer.tick(new Date(expiresAt)), true);
+    assert.equal(handled.writer.state.expiryCheck.complete, true);
+    assert.equal(await handled.writer.tick(new Date('2026-11-09T17:05:00Z')), false);
+    assert.equal(handledChecks, 1, `Successful ${operation} finishes the expiry check`);
+  }
+
+  const legacyPath = join(directory, 'legacy-expiry.json');
+  const legacy = harness({ assistant_state_file: legacyPath });
+  const legacyState = {
+    ...legacy.writer.state,
+    previous: { lines: valid, expires_at: '2026-11-09T17:00:00Z' },
+    expiryChecked: '2026-11-09T17:00:00Z',
+  };
+  delete legacyState.expiryCheck;
+  await writeFile(legacyPath, JSON.stringify(legacyState));
+  await legacy.writer.load();
+  let legacyChecks = 0;
+  legacy.writer.setDecision(async () => {
+    legacyChecks++;
+    return true;
+  });
+  assert.equal(await legacy.writer.tick(new Date('2026-11-09T18:00:00Z')), true);
+  assert.equal(await legacy.writer.tick(new Date('2026-11-09T18:05:00Z')), false);
+  assert.equal(legacyChecks, 1, 'The old attempt marker cannot suppress the new bounded recovery');
+  const completedLegacy = harness({ assistant_state_file: legacyPath });
+  await completedLegacy.writer.load();
+  completedLegacy.writer.setDecision(async () => {
+    throw new Error('completed expiry should survive restart');
+  });
+  assert.equal(await completedLegacy.writer.tick(new Date('2026-11-09T18:10:00Z')), false);
+  assert.equal(completedLegacy.writer.state.expiryCheck.complete, true);
+
   const off = harness({ assistant_screen_times: [] });
   off.writer.setDecision(async () => {
     throw new Error('disabled schedule');

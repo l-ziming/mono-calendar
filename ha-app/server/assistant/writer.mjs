@@ -14,6 +14,8 @@ const bundledPrompt = () =>
     cause.code === 'ENOENT' ? '' : Promise.reject(cause),
   );
 const sameLines = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const EXPIRY_RETRY_MS = 5 * 60000;
+const MAX_EXPIRY_ATTEMPTS = 3;
 // An empty display has no meaningful HA change timestamp in the shared context.
 const screenVersion = (lines, at) => fingerprint({ lines, at: lines.length ? at || null : null });
 const rejected = (reason) => ({ status: 'rejected', reason });
@@ -66,6 +68,7 @@ export class AssistantWriter {
       morningNewsDay: null,
       lastMajorNewsAt: 0,
       lastNewsAt: 0,
+      expiryCheck: null,
     };
     this.busy = false;
     this.stateError = false;
@@ -119,10 +122,27 @@ export class AssistantWriter {
       const state = JSON.parse(await readFile(this.path, 'utf8'));
       if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('invalid schedule state');
       this.state = { ...this.state, ...state };
+      // The old marker recorded an attempt before knowing whether the check succeeded.
+      delete this.state.expiryChecked;
       for (const key of ['usedNews', 'attempted', 'writes', 'reminders'])
         if (!Array.isArray(this.state[key])) throw new Error('invalid schedule state');
       if (this.state.writes.some((value) => !Number.isFinite(value) || value < 0))
         throw new Error('invalid screen write times');
+      const expiryCheck = this.state.expiryCheck;
+      if (
+        expiryCheck !== null &&
+        (typeof expiryCheck !== 'object' ||
+          Array.isArray(expiryCheck) ||
+          typeof expiryCheck.expires_at !== 'string' ||
+          !Number.isFinite(Date.parse(expiryCheck.expires_at)) ||
+          !Number.isInteger(expiryCheck.attempts) ||
+          expiryCheck.attempts < 1 ||
+          expiryCheck.attempts > MAX_EXPIRY_ATTEMPTS ||
+          !Number.isFinite(expiryCheck.attempted_at) ||
+          expiryCheck.attempted_at < 0 ||
+          typeof expiryCheck.complete !== 'boolean')
+      )
+        throw new Error('invalid expiry check');
     } catch (cause) {
       if (cause.code !== 'ENOENT') {
         this.stateError = true;
@@ -468,20 +488,38 @@ export class AssistantWriter {
       const time = clock(now.getTime(), this.config.timezone);
       const slot = day + 'T' + time;
       const scheduled = this.settings.assistant_screen_times.includes(time) && !this.state.attempted.includes(slot);
-      // The display hides an expired note, so its expiry triggers one recheck instead of a blank screen until the next slot.
+      // Failed expiry checks retry with a bounded budget; fixed screen slots remain independent.
       const previous = this.state.previous;
       const expiry = previous?.lines?.length && Date.parse(previous.expires_at) <= +now ? previous.expires_at : null;
-      if (!scheduled && (!expiry || this.state.expiryChecked === expiry)) return false;
+      const expiryCheck = this.state.expiryCheck?.expires_at === expiry ? this.state.expiryCheck : null;
+      const attempts = expiryCheck?.attempts || 0;
+      const quiet = this.quiet(+now);
+      const expiryDue =
+        expiry &&
+        !expiryCheck?.complete &&
+        attempts < MAX_EXPIRY_ATTEMPTS &&
+        (!expiryCheck || +now - expiryCheck.attempted_at >= EXPIRY_RETRY_MS);
+      if (!scheduled && (!expiryDue || quiet)) return false;
       if (scheduled)
         this.state.attempted = [
           ...this.state.attempted.filter((x) => typeof x === 'string' && x.startsWith(day)),
           slot,
         ].slice(-24);
-      if (expiry) this.state.expiryChecked = expiry;
+      if (expiry && !quiet)
+        this.state.expiryCheck = {
+          expires_at: expiry,
+          attempts: Math.min(attempts + 1, MAX_EXPIRY_ATTEMPTS),
+          attempted_at: now.getTime(),
+          complete: expiryCheck?.complete || false,
+        };
       this.state.lastCheck = now.getTime();
       if (!(await this.save())) return false;
-      if (!scheduled && this.quiet(+now)) return false; // quiet hours refuse the write; the next slot rechecks
-      return await this.decide('scheduled', now);
+      const result = await this.decide('scheduled', now);
+      if (result && expiry && !quiet) {
+        this.state.expiryCheck.complete = true;
+        await this.save();
+      }
+      return result;
     } catch {
       console.warn('Assistant: scheduled screen check failed.');
       return false;
