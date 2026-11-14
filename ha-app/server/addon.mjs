@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { start } from './app.mjs';
 import { assistantSettings } from './assistant/settings.mjs';
+import { displaySettings } from './display-config.mjs';
 
 // Adapt Supervisor options without exposing HA credentials to the display client.
 export function addonSettings(options, defaults, supervisorToken) {
@@ -108,6 +109,11 @@ export function addonSettings(options, defaults, supervisorToken) {
     throw new Error('Invalid assistant prompt');
   }
   const assistant = assistantSettings(options, defaults);
+  const display = {
+    rooms: options.rooms === undefined ? defaults.rooms : options.rooms,
+    devices: options.devices === undefined ? defaults.devices : options.devices,
+  };
+  displaySettings({ entities, ...display });
   return {
     config: {
       ...defaults,
@@ -118,6 +124,7 @@ export function addonSettings(options, defaults, supervisorToken) {
       timezone,
       temperature_unit: temperatureUnit,
       entities,
+      ...display,
       calendars,
       assistant_entities: [...new Set(assistantEntities)],
       assistant_news_mode: newsMode,

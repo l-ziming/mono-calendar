@@ -42,6 +42,43 @@ App 通过 Supervisor 的 `homeassistant_api` 读取状态和控制设备。
 
 缺测显示「—」。助手图片使用 `image.*` 实体，居中裁成 128×128 灰度图；留空显示引号。
 
+## 房间和设备
+
+在 HA App 配置页填写 `rooms` 和 `devices`，保存并重启。房间最多 6 个，设备最多 8 个，按列表顺序显示；数量增加时屏幕改为多列、两行排列。名称最长 32 字，屏幕按可用宽度截断。两个空列表沿用上面的旧实体映射，已有安装无需迁移。
+
+```yaml
+rooms:
+  - id: living
+    name: 客厅
+    temperature: climate.living_room#current_temperature
+    humidity: climate.living_room#current_humidity
+  - id: bedroom
+    name: 卧室
+    temperature: sensor.bedroom_temperature
+    humidity: sensor.bedroom_humidity
+  - id: study
+    name: 书房
+    temperature: sensor.study_temperature
+    humidity: sensor.study_humidity
+devices:
+  - id: desk_light
+    name: 书桌灯
+    entity: light.desk
+    type: toggle
+  - id: circulator
+    name: 循环扇
+    entity: fan.study
+    type: toggle
+  - id: central_fan
+    name: 空调风扇
+    entity: climate.living_room
+    type: nest_fan
+```
+
+房间的温度、湿度可留空，传感器支持 `entity_id#attribute`，缺测显示「—」。`id` 以小写字母开头，只用小写字母、数字和下划线，最长 32 字符，同一列表内不能重复。设备实体不能重复；`toggle` 只控制 `light`、`switch` 和 `fan` 的开关，`nest_fan` 只用于支持 Nest 定时风扇的 `climate` 实体，开启后由设备自身的 15 分钟定时器关闭。
+
+配置名单内的设备才可通过屏幕控制。助手读取全部已配置设备；房间温湿度仍按各自有效读数求平均提供给助手。
+
 ## 日历接入
 
 1. 在 HA 添加 CalDAV。iCloud 地址为 `https://caldav.icloud.com/`，填写 Apple 账户邮箱和 App 专用密码，保持证书验证开启。

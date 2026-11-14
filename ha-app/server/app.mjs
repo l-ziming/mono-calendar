@@ -9,6 +9,7 @@ import { clock } from './metrics.mjs';
 import { readLines } from './assistant/text.mjs';
 import { newsletterCandidate } from './sources/newsletter.mjs';
 import { gzipSync } from 'node:zlib';
+import { displaySettings } from './display-config.mjs';
 
 const chatAssets = new Map();
 async function chatAsset(res, req, file, type) {
@@ -34,11 +35,6 @@ async function chatAsset(res, req, file, type) {
 // The display draws the page and handles every tap itself. This service only summarises Home Assistant
 // as one JSON document (GET /data) and forwards the writes the panel offers (POST /action).
 const AGENDA_DAYS = 43; // today .. six weeks ahead, enough for the month the panel can show without a fetch.
-const DEVICES = [
-  ['bedroom_light', '卧室落地灯'],
-  ['desk_light', '屏幕挂灯'],
-  ['fan', '风扇'],
-];
 // One write = send + read back until HA reports the target, all inside one budget. After that the
 // request is "unconfirmed" (it may still have reached the device) and is re-checked in the background.
 const ASSISTANT_BUDGET_MS = 390000;
@@ -83,6 +79,8 @@ function mean(...values) {
 }
 
 export function createApp(config, env, options = {}) {
+  const display = displaySettings(config);
+  const deviceSpecs = new Map(display.devices.map((device) => [device.id, device]));
   function entityList(key, domain) {
     const values = config[key] ?? [];
     if (
@@ -117,7 +115,7 @@ export function createApp(config, env, options = {}) {
   const now = options.now || (() => new Date());
   let snapshot = { states: {}, forecast: [], online: false, updated: null, forecastStale: true };
   const agenda = { data: { status: 'loading', events: [] }, next: 0, busy: false, from: null };
-  let fanUntil = 0; // end of the Nest fan timer this server started; only shown as minutes left, lost on restart
+  const fanUntil = new Map(); // Nest timer deadlines started here, shown as minutes left and lost on restart
   const uncertain = new Set(); // a timed-out write may still have reached the device
   const requests = new Map();
   const chains = new Map();
@@ -156,6 +154,11 @@ export function createApp(config, env, options = {}) {
         ...Object.values(config.entities)
           .filter(Boolean)
           .map((x) => x.split('#')[0]),
+        ...display.rooms
+          .flatMap((room) => [room.temperature, room.humidity])
+          .filter(Boolean)
+          .map((id) => id.split('#')[0]),
+        ...display.devices.map((device) => device.entity).filter(Boolean),
         ...(config.assistant_entities || []),
         ...(config.assistant_presence_entities || []),
       ]),
@@ -309,6 +312,21 @@ export function createApp(config, env, options = {}) {
     await agenda.pending;
   }
 
+  function roomReadings(states) {
+    return display.rooms.map(({ id, name, temperature, humidity }) => {
+      const sensor = states[temperature.split('#')[0]];
+      return {
+        id,
+        name,
+        temp: celsius(
+          reading(states, temperature),
+          sensor?.attributes?.unit_of_measurement || sensor?.attributes?.temperature_unit || config.temperature_unit,
+        ),
+        humidity: finiteNumber(reading(states, humidity)),
+      };
+    });
+  }
+
   /** The panel's whole data set: no layout, no calendar maths (the display computes those offline). */
   function data(time = now()) {
     const at = time.getTime();
@@ -318,13 +336,6 @@ export function createApp(config, env, options = {}) {
     const entities = config.entities;
     const climate = states[entities.climate]?.attributes || {};
     const climateUnit = climate.temperature_unit || config.temperature_unit;
-    const light = (id) => {
-      const state = states[entities[id]]?.state;
-      return { on: state === 'on', available: snapshot.online && (state === 'on' || state === 'off') };
-    };
-    // The fan is the Nest's own fan, run by its built-in timer; without a reported fan_mode the button reads 不可用.
-    const fan = { on: fanOn(), available: snapshot.online && fanKnown() };
-    const fanLeft = Math.ceil((fanUntil - at) / 60000);
     const history = view.co2History || [];
     return {
       dataTime: Date.parse(snapshot.updated) || 0,
@@ -349,6 +360,7 @@ export function createApp(config, env, options = {}) {
           bearing: x.bearing,
         })),
       },
+      rooms: roomReadings(states),
       indoor: {
         living: { temp: view.living, humidity: finiteNumber(view.livingHumidity) },
         bedroom: { temp: view.bedroom, humidity: finiteNumber(view.bedroomHumidity) },
@@ -381,12 +393,20 @@ export function createApp(config, env, options = {}) {
         max: celsius(climate.max_temp ?? (climateUnit === '°F' ? 89.6 : 32), climateUnit),
         gap: 2,
       },
-      devices: DEVICES.map(([id, name]) => ({
-        id,
-        name,
-        ...(id === 'fan' ? fan : light(id)),
-        ...(id === 'fan' && fan.on && fanLeft > 0 ? { minutes: Math.min(15, fanLeft) } : {}),
-      })),
+      devices: display.devices.map(({ id, name, entity, type }) => {
+        const state = states[entity]?.state;
+        const on = type === 'nest_fan' ? fanOn(entity) : state === 'on';
+        const available = snapshot.online && (type === 'nest_fan' ? fanKnown(entity) : ['on', 'off'].includes(state));
+        const minutes = Math.ceil(((fanUntil.get(entity) || 0) - at) / 60000);
+        return {
+          id,
+          name,
+          type,
+          on,
+          available,
+          ...(type === 'nest_fan' && on && minutes > 0 ? { minutes: Math.min(15, minutes) } : {}),
+        };
+      }),
       assistant: { lines: assistant ? assistant.writer.panelLines(view.hint, time) : view.hint, image: imageVersion() },
       // Write progress for the panel: it shows waiting/unconfirmed marks from this, never from its own guesses.
       server: boot,
@@ -474,7 +494,10 @@ export function createApp(config, env, options = {}) {
       }
       return { key: 'assistant' };
     }
-    const device = /^device:(bedroom_light|desk_light|fan):(on|off)$/.exec(action);
+    const device = /^device:([a-z][a-z0-9_]{0,31}):(on|off)$/.exec(action);
+    if (device && !deviceSpecs.has(device[1])) {
+      throw fail(400, 'unknown device');
+    }
     if (
       !device &&
       !/^(mode:(heat|cool|heat_cool|off)|temp_(up|down)|temp:(?:(?:heat|cool):)?\d+(?:\.\d+)?|range_(low|high)_(up|down)|range:\d+(?:\.\d+)?:\d+(?:\.\d+)?)$/.test(
@@ -527,7 +550,7 @@ export function createApp(config, env, options = {}) {
     actionSeq++;
     const request = { id, key: parsed.key, action, seq: actionSeq, status: 'pending', accepted: clockMs() };
     request.budget = budget;
-    if (parsed.key === 'device:fan') {
+    if (parsed.device && deviceSpecs.get(parsed.device[1]).type === 'nest_fan') {
       request.budget = fanBudget;
     } else if (parsed.key === 'assistant') {
       request.budget = ASSISTANT_BUDGET_MS;
@@ -690,20 +713,22 @@ export function createApp(config, env, options = {}) {
       },
     };
   }
-  function fanMode() {
-    return snapshot.states[config.entities.climate]?.attributes?.fan_mode;
+  function fanMode(entity) {
+    return snapshot.states[entity]?.attributes?.fan_mode;
   }
-  function fanKnown() {
-    const state = snapshot.states[config.entities.climate]?.state;
-    return Boolean(state) && !['unknown', 'unavailable'].includes(state) && ['on', 'off', 'auto'].includes(fanMode());
+  function fanKnown(entity) {
+    const state = snapshot.states[entity]?.state;
+    return (
+      Boolean(state) && !['unknown', 'unavailable'].includes(state) && ['on', 'off', 'auto'].includes(fanMode(entity))
+    );
   }
   /** The fan is on only when the Nest reports fan_mode "on". */
-  function fanOn() {
-    return fanKnown() && fanMode() === 'on';
+  function fanOn(entity) {
+    return fanKnown(entity) && fanMode(entity) === 'on';
   }
   /** Drives a device to the requested state (no blind toggles); confirmation needs HA's own report. */
   function deviceWrite(id, on) {
-    const entities = config.entities;
+    const { entity, type } = deviceSpecs.get(id);
     const usable = (entity) =>
       snapshot.states[entity] && !['unknown', 'unavailable'].includes(snapshot.states[entity].state);
     const key = 'device:' + id;
@@ -711,33 +736,32 @@ export function createApp(config, env, options = {}) {
       if (!snapshot.online) {
         return false;
       }
-      if (id === 'fan') {
-        return fanKnown() && fanOn() === on;
+      if (type === 'nest_fan') {
+        return fanKnown(entity) && fanOn(entity) === on;
       }
-      return usable(entities[id]) && snapshot.states[entities[id]].state === (on ? 'on' : 'off');
+      return usable(entity) && snapshot.states[entity].state === (on ? 'on' : 'off');
     };
     let send;
-    if (id === 'fan') {
-      if (!fanKnown()) {
+    if (type === 'nest_fan') {
+      if (!fanKnown(entity)) {
         throw fail(409, '风机状态不可用');
       }
       // The Nest's own 15-minute timer stops the fan, so a restarted HA or a lost off command cannot leave it
       // running for the 12 hours a plain set_fan_mode asks for.
       if (on) {
         send = async () => {
-          await ha.service('nest', 'set_fan_timer', { entity_id: entities.climate, duration: FAN_RUN });
-          fanUntil = now().getTime() + FAN_RUN_MS;
+          await ha.service('nest', 'set_fan_timer', { entity_id: entity, duration: FAN_RUN });
+          fanUntil.set(entity, now().getTime() + FAN_RUN_MS);
         };
       } else {
         send = async () => {
-          await ha.service('climate', 'set_fan_mode', { entity_id: entities.climate, fan_mode: 'off' });
-          fanUntil = 0;
+          await ha.service('climate', 'set_fan_mode', { entity_id: entity, fan_mode: 'off' });
+          fanUntil.delete(entity);
         };
       }
     } else {
-      const entity = entities[id];
       const domain = entity?.split('.')[0];
-      if (!usable(entity) || !['light', 'switch'].includes(domain)) {
+      if (!usable(entity) || !['light', 'switch', 'fan'].includes(domain)) {
         throw fail(409, '设备不可用');
       }
       if (!['on', 'off'].includes(snapshot.states[entity].state)) {
@@ -749,7 +773,7 @@ export function createApp(config, env, options = {}) {
       return null;
     }
     let message = '设备操作未确认';
-    if (id === 'fan') {
+    if (type === 'nest_fan') {
       message = on ? '风机未回报开启状态' : '风机未回报关闭状态';
     }
     return {
@@ -869,7 +893,7 @@ export function createApp(config, env, options = {}) {
         ['humidifier', 'bedroom_light', 'desk_light', 'climate']
           .map((key) => config.entities[key])
           .filter(Boolean)
-          .concat(config.assistant_entities || []),
+          .concat(display.devices.map((device) => device.entity).filter(Boolean), config.assistant_entities || []),
       ),
     ];
     const attributes = [
@@ -923,6 +947,7 @@ export function createApp(config, env, options = {}) {
         note: '仅为在家状态的辅助线索；未知或离线时不能判断人在家或离家。',
       };
     });
+    const rooms = roomReadings(snapshot.states);
     const previous = readLines(snapshot.states[config.entities.assistant_text]?.state);
     const alert = reading(snapshot.states, config.entities.weather_alert);
     return {
@@ -972,9 +997,9 @@ export function createApp(config, env, options = {}) {
         timezone: config.timezone,
       }),
       indoor: {
-        temperature: mean(view.living, view.bedroom),
+        temperature: mean(...rooms.map((room) => room.temp)),
         temperature_unit: '°C',
-        humidity: mean(view.livingHumidity, view.bedroomHumidity),
+        humidity: mean(...rooms.map((room) => room.humidity)),
         co2: view.co2,
         co2_level: view.grades.co2.label,
         pm25: view.pm25,

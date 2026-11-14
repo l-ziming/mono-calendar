@@ -9,9 +9,40 @@ import java.util.*;
  */
 public final class Page {
     public static final int W = 1650, H = 2200;
-    // Sixteen-level greys (step 17), mapped from the design colours.
-    static final int BLACK = 0, G333 = 51, G444 = 68, G555 = 85, G666 = 102, G777 = 119, G999 = 153, GAAA = 170,
-                     GBBB = 187, GCCC = 204, GDDD = 221, GEEE = 238, WHITE = 255;
+
+    // ---------------------------------------------------------------- design tokens
+    // Name a role, never a value. The panel shows 16 greys (step 17): text greys sit 4 steps apart, surface greys
+    // 2 steps apart, and the two families never meet. Small areas need a darker grey than large ones to read.
+    /** Main content, structural rules, the inverse ground of "now" and "needs you". */
+    static final int INK = 0x00;
+    /** Secondary text: labels, units, meta. */
+    static final int INK_2 = 0x44;
+    /** Receded: outside the month, unavailable, a missing "—", waiting. */
+    static final int INK_3 = 0x88;
+    /** Small grey areas: selection, tags, tracks, light rules. */
+    static final int TINT = 0xCC;
+    /** Large grey areas: weekends, buttons, cards, chart areas. */
+    static final int FILL = 0xEE;
+    /** Paper, and text on the inverse ground. */
+    static final int PAPER = 0xFF;
+    /** Data encoding only (AQI, over the limit), never chrome: light to dark, at least 2 steps apart. */
+    static final int[] DATA = {0xEE, 0xCC, 0xAA, 0x88, 0x44, 0x00};
+    /** Every grey the page may draw; desktop checks reject any other. */
+    public static final int[] GREYS = {INK, INK_2, INK_3, DATA[2], TINT, FILL, PAPER};
+
+    // Type: nine sizes, about 1.25x apart up to T_H2 and 1.5x or more for display. Serif sets time and readings,
+    // Noto Sans SC sets words, Inter sets UI digits and Latin. At 18 px and below a face steps up to SemiBold.
+    static final float T_MICRO = 15, T_CAPTION = 18, T_BODY = 22, T_TITLE = 28, T_H3 = 36, T_H2 = 44, T_H1 = 72,
+                       T_DISPLAY = 112, T_HERO = 232;
+    /** The hint's opening quote is a glyph, not text, and stays outside the scale. */
+    static final float QUOTE_GLYPH = 154;
+    /** Every text size the page may use; desktop checks reject any other. */
+    public static final float[] TYPE_SCALE = {
+        T_MICRO, T_CAPTION, T_BODY, T_TITLE, T_H3, T_H2, T_H1, T_DISPLAY, T_HERO, QUOTE_GLYPH};
+
+    // Rules: BLOCK separates the page's regions and is the "on" bar on top of a control; TITLE sits under a module
+    // title and tops each calendar week; ROW separates rows and columns. A light rule is ROW in TINT.
+    static final float RULE_BLOCK = 4, RULE_TITLE = 3, RULE_ROW = 2;
     /** Named regions for partial e-ink refreshes. */
     public static final float[][] REGIONS = {{72, 56, 1000, 266}, {1000, 56, 1590, 240},
         {72, 266, 1578, 324}, // date, status+shichen, year progress
@@ -194,6 +225,14 @@ public final class Page {
     void rect(float l, float t, float r, float b, int g) {
         ink.rect(l, t, r, b, g);
     }
+    /** A horizontal rule whose top edge is at top. */
+    void hrule(float l, float top, float r, float weight, int gray) {
+        rect(l, top, r, top + weight, gray);
+    }
+    /** A vertical rule whose left edge is at left. */
+    void vrule(float left, float t, float b, float weight, int gray) {
+        rect(left, t, left + weight, b, gray);
+    }
     void icon(String d, float left, float top, float scale, float stroke, int gray) {
         ink.path(Svg.path(d, left, top, scale), -1, stroke * scale, gray, true);
     }
@@ -246,12 +285,12 @@ public final class Page {
             viewState.viewMonth = t[1];
         }
         String clock = two(calendar.get(Calendar.HOUR_OF_DAY)) + ":" + two(calendar.get(Calendar.MINUTE));
-        rect(0, 0, W, H, WHITE);
+        rect(0, 0, W, H, PAPER);
         header(calendar, today, status, viewState);
         schedule(data, viewState.selected, today, clock);
         almanac(viewState, today);
         terms(viewState, today);
-        rect(744, 342, 746, 1042, BLACK);
+        vrule(744, 342, 1042, RULE_ROW, INK);
         month(data, viewState, today);
         weather(data, clock);
         indoor(data);
@@ -266,27 +305,27 @@ public final class Page {
     private void header(Calendar calendar, long today, Status status, State viewState) {
         Almanac.Day day = almanac.day(today);
         String dayText = two(day.day);
-        float xm = 72 + tracked(dayText, 72, 249.5f, Ink.SERIF, 232, -1, -6) - 72 + 44;
-        tracked(dayText, 72, 249.5f, Ink.SERIF, 232, BLACK, -6);
+        float xm = 72 + tracked(dayText, 72, 249.5f, Ink.SERIF, T_HERO, -1, -6) - 72 + 44;
+        tracked(dayText, 72, 249.5f, Ink.SERIF, T_HERO, INK, -6);
         text("星期"
                 + "日一二三四五六".charAt(day.weekday()),
-            xm, 143.5f, Ink.SERIF_BOLD, 68, BLACK);
+            xm, 143.5f, Ink.SERIF_BOLD, T_H1, INK);
         float r2 = 165, r3 = 212;
-        text(day.known ? "农历" + day.lunarText() : "", xm, 190, Ink.SANS_BOLD, 28, BLACK);
-        rect(xm + 190, r2, xm + 192, r2 + 26, BLACK);
-        tracked(day.known ? day.ganzhi() : "", xm + 210, 188.5f, Ink.SANS_MEDIUM, 24, BLACK, 1);
-        text(day.year + " 年 " + day.month + " 月", xm, 231, Ink.INTER_SEMIBOLD, 22, BLACK);
-        rect(xm + 190, r3, xm + 192, r3 + 22, BLACK);
+        text(day.known ? "农历" + day.lunarText() : "", xm, 190, Ink.SANS_BOLD, T_TITLE, INK);
+        vrule(xm + 190, r2, r2 + 26, RULE_ROW, INK);
+        tracked(day.known ? day.ganzhi() : "", xm + 210, 188.5f, Ink.SANS_MEDIUM, T_BODY, INK, 1);
+        text(day.year + " 年 " + day.month + " 月", xm, 231, Ink.INTER_SEMIBOLD, T_BODY, INK);
+        vrule(xm + 190, r3, r3 + 22, RULE_ROW, INK);
         int dayOfYear = (int) (today - Almanac.epochDay(day.year, 1, 1)) + 1,
             yearDays = (int) (Almanac.epochDay(day.year + 1, 1, 1) - Almanac.epochDay(day.year, 1, 1));
         float x = xm + 210;
-        x = text("第 ", x, 231, Ink.INTER_MEDIUM, 22, G444);
-        x = text(String.valueOf(day.isoWeek()), x, 231, Ink.INTER_SEMIBOLD, 22, BLACK);
-        x = text(" 周", x, 231, Ink.INTER_MEDIUM, 22, G444);
+        x = text("第 ", x, 231, Ink.INTER_MEDIUM, T_BODY, INK_2);
+        x = text(String.valueOf(day.isoWeek()), x, 231, Ink.INTER_SEMIBOLD, T_BODY, INK);
+        x = text(" 周", x, 231, Ink.INTER_MEDIUM, T_BODY, INK_2);
         x += 18;
-        x = text("第 ", x, 231, Ink.INTER_MEDIUM, 22, G444);
-        x = text(String.valueOf(dayOfYear), x, 231, Ink.INTER_SEMIBOLD, 22, BLACK);
-        text(" 天", x, 231, Ink.INTER_MEDIUM, 22, G444);
+        x = text("第 ", x, 231, Ink.INTER_MEDIUM, T_BODY, INK_2);
+        x = text(String.valueOf(dayOfYear), x, 231, Ink.INTER_SEMIBOLD, T_BODY, INK);
+        text(" 天", x, 231, Ink.INTER_MEDIUM, T_BODY, INK_2);
 
         // Status row: warning, Wi-Fi, divider, battery — right to left, all centred on y = 99.
         String batteryText;
@@ -297,56 +336,57 @@ public final class Page {
         } else {
             batteryText = status.battery + "%";
         }
-        int batteryFont = status.full ? Ink.SANS_MEDIUM : Ink.INTER_MEDIUM;
-        float batLeft = 1524 - width(batteryText, batteryFont, 20);
-        text(batteryText, batLeft, 106.3f, batteryFont, 20, BLACK);
-        ink.path(roundRect(1535.25f, 89.25f, 1573.75f, 108.75f, 4), -1, 2.5f, BLACK, false);
+        int batteryFont = status.full ? Ink.SANS_SEMIBOLD : Ink.INTER_SEMIBOLD;
+        float batLeft = 1524 - width(batteryText, batteryFont, T_CAPTION);
+        text(batteryText, batLeft, 106.3f, batteryFont, T_CAPTION, INK);
+        ink.path(roundRect(1535.25f, 89.25f, 1573.75f, 108.75f, 4), -1, 2.5f, INK, false);
         int level = status.full ? 100 : Math.max(0, Math.min(100, status.battery));
         if (level > 0)
             ink.path(
-                roundRect(1538.5f, 92.5f, 1538.5f + Math.max(3, 32f * level / 100), 105.5f, 1.5f), BLACK, 0, -1, false);
-        ink.line(1576.5f, 96, 1576.5f, 102, 2.5f, BLACK, 0, 0);
+                roundRect(1538.5f, 92.5f, 1538.5f + Math.max(3, 32f * level / 100), 105.5f, 1.5f), INK, 0, -1, false);
+        ink.line(1576.5f, 96, 1576.5f, 102, 2.5f, INK, 0, 0);
         if (status.charging) { // plugged in: a bolt slightly taller than the battery, cut out of outline and fill by a
             // white gap
             float[] bolt = Svg.path("M11 0L0 12.6H7.2L5 23.2L17.4 9.4H10.2L12.4 0Z", 1545.8f, 87.4f, 1);
-            ink.path(bolt, WHITE, 4.6f, WHITE, true);
-            ink.path(bolt, BLACK, 0, -1, false);
+            ink.path(bolt, PAPER, 4.6f, PAPER, true);
+            ink.path(bolt, INK, 0, -1, false);
         }
         if (viewState.menu)
-            rect(batLeft - 8, 77, 1586, 81, BLACK);
+            hrule(batLeft - 8, 77, 1586, RULE_BLOCK, INK);
         target(batLeft - 8, 77, 1586, 121, "menu");
         float divider = batLeft - 20;
-        rect(divider, 88, divider + 2, 110, BLACK);
+        vrule(divider, 88, 110, RULE_ROW, INK);
         float wifiLeft = divider - 18 - 32;
         if (status.wifi) {
             for (String p : new String[] {"M2.21 8.21A19.5 19.5 0 0 1 29.79 8.21L26.61 11.39A15 15 0 0 0 5.39 11.39Z",
                      "M7.16 13.16A12.5 12.5 0 0 1 24.84 13.16L21.66 16.34A8 8 0 0 0 10.34 16.34Z",
                      "M16 22L12.11 18.11A5.5 5.5 0 0 1 19.89 18.11Z"})
-                ink.path(Svg.path(p, wifiLeft, 87, 1), BLACK, 1.2f, BLACK, false);
+                ink.path(Svg.path(p, wifiLeft, 87, 1), INK, 1.2f, INK, false);
         } else
-            ink.path(Svg.path("M16 22L2.21 8.21A19.5 19.5 0 0 1 29.79 8.21Z", wifiLeft, 87, 1), -1, 1, BLACK, false);
+            ink.path(Svg.path("M16 22L2.21 8.21A19.5 19.5 0 0 1 29.79 8.21Z", wifiLeft, 87, 1), -1, 1, INK, false);
         if (status.warning != null && !status.warning.isEmpty()) {
-            float left = wifiLeft - 18 - (12 + 28 + 8 + width(status.warning, Ink.INTER_MEDIUM, 18) + 12);
-            rect(left, 83, wifiLeft - 18, 115, BLACK);
-            ink.path(Svg.path("M14 1.5L27 24.5H1Z", left + 12, 86, 1), WHITE, 2, WHITE, true);
-            ink.line(left + 26, 94.5f, left + 26, 102.5f, 3.2f, BLACK, 0, 0);
-            ink.circle(left + 26, 106.8f, 1.9f, BLACK, 0, -1);
-            text(status.warning, left + 48, 107, Ink.INTER_MEDIUM, 18, WHITE);
+            float left = wifiLeft - 18 - (12 + 28 + 8 + width(status.warning, Ink.INTER_MEDIUM, T_CAPTION) + 12);
+            rect(left, 83, wifiLeft - 18, 115, INK);
+            ink.path(Svg.path("M14 1.5L27 24.5H1Z", left + 12, 86, 1), PAPER, 2, PAPER, true);
+            ink.line(left + 26, 94.5f, left + 26, 102.5f, 3.2f, INK, 0, 0);
+            ink.circle(left + 26, 106.8f, 1.9f, INK, 0, -1);
+            // Warnings can carry server text, so they keep Medium: the only full CJK face besides Regular.
+            text(status.warning, left + 48, 107, Ink.INTER_MEDIUM, T_CAPTION, PAPER);
         }
         int hour = calendar.get(Calendar.HOUR_OF_DAY), minute = calendar.get(Calendar.MINUTE), quarter = minute / 15;
         String shichen = ""
             + "子丑寅卯辰巳午未申酉戌亥".charAt((hour + 1) / 2 % 12) + (hour % 2 == 1 ? "初" : "正")
             + new String[] {"初刻", "一刻", "二刻", "三刻"}[quarter];
-        right(shichen, 1578, 190.5f, Ink.SERIF_BOLD, 64, BLACK);
+        right(shichen, 1578, 190.5f, Ink.SERIF_BOLD, T_H1, INK);
         int start = hour * 60 + quarter * 15, end = (start + 15) % 1440;
         right(two(start / 60) + ":" + two(start % 60) + "–" + two(end / 60) + ":" + two(end % 60), 1578, 232.5f,
-            Ink.INTER_MEDIUM, 22, G444);
-        rect(72, 276, 1578, 280, BLACK);
+            Ink.INTER_MEDIUM, T_BODY, INK_2);
+        hrule(72, 276, 1578, RULE_BLOCK, INK);
         String progress =
             String.format(Locale.US, "今年已过 %.1f%% 余 %d 天", dayOfYear * 100.0 / yearDays, yearDays - dayOfYear);
-        float pl = right(progress, 1578, 310, Ink.INTER_MEDIUM, 18, BLACK) - 20;
-        rect(72, 296, pl, 308, GDDD);
-        rect(72, 296, 72 + (pl - 72) * dayOfYear / yearDays, 308, BLACK);
+        float pl = right(progress, 1578, 310, Ink.INTER_SEMIBOLD, T_CAPTION, INK) - 20;
+        rect(72, 296, pl, 308, TINT);
+        rect(72, 296, 72 + (pl - 72) * dayOfYear / yearDays, 308, INK);
     }
     static float[] roundRect(float l, float t, float r, float b, float radius) {
         String d = String.format(Locale.US,
@@ -355,12 +395,13 @@ public final class Page {
             radius, l, b - radius, t + radius, radius, radius, l + radius, t);
         return Svg.path(d, 0, 0, 1);
     }
-    /** A 28px section title in a 52px row, with optional grey meta text right-aligned at 712. */
+    /** A T_TITLE section title in a 52px row, with optional grey meta text right-aligned at 712. */
     private float title(String name, float top, String meta) {
-        text(name, 72, base(top, 52, Ink.SANS_BOLD, 28, name), Ink.SANS_BOLD, 28, BLACK);
-        return meta == null || meta.isEmpty()
-            ? 712
-            : right(meta, 712, base(top, 52, Ink.INTER_SEMIBOLD, 18, meta), Ink.INTER_SEMIBOLD, 18, G444);
+        text(name, 72, base(top, 52, Ink.SANS_BOLD, T_TITLE, name), Ink.SANS_BOLD, T_TITLE, INK);
+        if (meta == null || meta.isEmpty())
+            return 712;
+        float y = base(top, 52, Ink.INTER_SEMIBOLD, T_CAPTION, meta);
+        return right(meta, 712, y, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
     }
     private String monthDay(long epoch) {
         Almanac.Day d = almanac.day(epoch);
@@ -467,33 +508,35 @@ public final class Page {
         for (int i = 0; i < EV_SLOTS; i++) {
             float top = 394 + 36 * i;
             Row row = i < rows.size() ? rows.get(i) : null;
-            float borderWidth = i == 0 ? 3 : 2;
-            rect(72, top, 712, top + borderWidth, i == 0 || row != null ? BLACK : GDDD);
+            float borderWidth = i == 0 ? RULE_TITLE : RULE_ROW;
+            hrule(72, top, 712, borderWidth, i == 0 || row != null ? INK : TINT);
             if (row == null) {
                 if (i == EV_SLOTS - 1)
-                    rect(72, top + 34, 712, top + 36, GDDD);
+                    hrule(72, top + 34, 712, RULE_ROW, TINT);
                 continue;
             }
             float x = 712;
             if (row.on) {
-                float w = width(row.extra, Ink.SANS_SEMIBOLD, 18) + 16,
+                float w = width(row.extra, Ink.SANS_SEMIBOLD, T_CAPTION) + 16,
                       t = top + borderWidth + (36 - borderWidth - 26) / 2;
                 x = 712 - w;
-                rect(x, t, 712, t + 26, GEEE);
-                text(row.extra, x + 8, base(t, 26, Ink.SANS_SEMIBOLD, 18, row.extra), Ink.SANS_SEMIBOLD, 18, G444);
+                rect(x, t, 712, t + 26, TINT);
+                text(row.extra, x + 8, base(t, 26, Ink.SANS_SEMIBOLD, T_CAPTION, row.extra), Ink.SANS_SEMIBOLD,
+                    T_CAPTION, INK_2);
             } else if (!row.extra.isEmpty())
-                x = right(row.extra, 712, base(top + borderWidth, 36 - borderWidth, Ink.INTER_SEMIBOLD, 18, row.extra),
-                    Ink.INTER_SEMIBOLD, 18, G444);
+                x = right(row.extra, 712,
+                    base(top + borderWidth, 36 - borderWidth, Ink.INTER_SEMIBOLD, T_CAPTION, row.extra),
+                    Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
             if (!"ev".equals(row.kind)) {
-                text(fit(row.title, x - 12 - 72, Ink.INTER_SEMIBOLD, 18), 72,
-                    base(top + borderWidth, 36 - borderWidth, Ink.INTER_SEMIBOLD, 18, row.title), Ink.INTER_SEMIBOLD,
-                    18, G444);
+                text(fit(row.title, x - 12 - 72, Ink.INTER_SEMIBOLD, T_CAPTION), 72,
+                    base(top + borderWidth, 36 - borderWidth, Ink.INTER_SEMIBOLD, T_CAPTION, row.title),
+                    Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
                 continue;
             }
-            center(row.time, 122, base(top + borderWidth, 36 - borderWidth, Ink.INTER_MEDIUM, 22, row.time),
-                Ink.INTER_MEDIUM, 22, BLACK);
-            text(fit(row.title, x - 12 - 184, Ink.SANS_MEDIUM, 22), 184,
-                base(top + borderWidth, 36 - borderWidth, Ink.SANS_MEDIUM, 22, "日"), Ink.SANS_MEDIUM, 22, BLACK);
+            center(row.time, 122, base(top + borderWidth, 36 - borderWidth, Ink.INTER_MEDIUM, T_BODY, row.time),
+                Ink.INTER_MEDIUM, T_BODY, INK);
+            text(fit(row.title, x - 12 - 184, Ink.SANS_MEDIUM, T_BODY), 184,
+                base(top + borderWidth, 36 - borderWidth, Ink.SANS_MEDIUM, T_BODY, "日"), Ink.SANS_MEDIUM, T_BODY, INK);
         }
     }
 
@@ -533,7 +576,7 @@ public final class Page {
         List<String> line = new ArrayList<>();
         float used = 0;
         for (String w : words.trim().split("\\s+")) {
-            float ww = width(w, Ink.SANS_MEDIUM, 22);
+            float ww = width(w, Ink.SANS_MEDIUM, T_BODY);
             if (!line.isEmpty() && used + 12 + ww > max) {
                 out.add(line);
                 if (out.size() == lines)
@@ -550,21 +593,23 @@ public final class Page {
     }
     /** An explanation card over the box top..bottom: tag, word (and when), then the wrapped text. */
     private void card(float top, float bottom, String kind, String word, String when) {
-        rect(72, top, 712, bottom, WHITE);
-        List<String> lines = prose(explain(kind, word), 528, Ink.SANS_MEDIUM, 22);
+        rect(72, top, 712, bottom, PAPER);
+        List<String> lines = prose(explain(kind, word), 528, Ink.SANS_MEDIUM, T_BODY);
         float h = 40 + 12 + 32 * lines.size(), t = top + (bottom - top - h) / 2;
-        rect(102, t, 142, t + 40, "宜".equals(kind) ? BLACK : GDDD);
-        center(kind, 122, base(t, 40, Ink.SERIF_BOLD, 24, kind), Ink.SERIF_BOLD, 24, "宜".equals(kind) ? WHITE : BLACK);
-        text(word, 154, base(t, 40, Ink.SERIF_BOLD, 28, word), Ink.SERIF_BOLD, 28, BLACK);
+        rect(102, t, 142, t + 40, "宜".equals(kind) ? INK : TINT);
+        center(kind, 122, base(t, 40, Ink.SERIF_BOLD, T_BODY, kind), Ink.SERIF_BOLD, T_BODY,
+            "宜".equals(kind) ? PAPER : INK);
+        text(word, 154, base(t, 40, Ink.SERIF_BOLD, T_TITLE, word), Ink.SERIF_BOLD, T_TITLE, INK);
         if (when != null)
-            right(when, 712, base(t, 40, Ink.INTER_SEMIBOLD, 18, when), Ink.INTER_SEMIBOLD, 18, G444);
+            right(when, 712, base(t, 40, Ink.INTER_SEMIBOLD, T_CAPTION, when), Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
         for (int i = 0; i < lines.size(); i++)
-            text(lines.get(i), 184, base(t + 52 + 32 * i, 32, Ink.SANS_MEDIUM, 22, "日"), Ink.SANS_MEDIUM, 22, BLACK);
+            text(lines.get(i), 184, base(t + 52 + 32 * i, 32, Ink.SANS_MEDIUM, T_BODY, "日"), Ink.SANS_MEDIUM, T_BODY,
+                INK);
         target(72, top, 712, bottom, "card:close");
     }
     private void almanac(State viewState, long today) {
         Almanac.Day day = almanac.day(viewState.selected);
-        rect(72, 627, 712, 630, BLACK);
+        hrule(72, 627, 712, RULE_TITLE, INK);
         if (!day.known) {
             title("黄历", 575, null);
             return;
@@ -572,14 +617,14 @@ public final class Page {
         String[] meta = {Almanac.JIANCHU.charAt(day.jianchu) + "日", "冲" + Almanac.ZODIAC.charAt(day.chong),
             "煞" + Almanac.SHA.charAt(day.sha)};
         title("黄历", 575, null);
-        float x = 712, y = base(575, 52, Ink.INTER_SEMIBOLD, 18, "日");
+        float x = 712, y = base(575, 52, Ink.INTER_SEMIBOLD, T_CAPTION, "日");
         for (int i = 2; i >= 0; i--) {
-            float l = right(meta[i], x, y, Ink.INTER_SEMIBOLD, 18, G444);
+            float l = right(meta[i], x, y, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
             target(l - 5, 575, x + 5, 627, "card:" + meta[i].charAt(i == 0 ? 1 : 0) + ":" + meta[i]);
             x = l - 10;
         }
         if (viewState.selected != today)
-            right(monthDay(viewState.selected), x, y, Ink.INTER_SEMIBOLD, 18, G444);
+            right(monthDay(viewState.selected), x, y, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
         List<List<String>> yi = flow(day.yi, 528, 2), ji = flow(day.ji, 528, 2);
         float hy = Math.max(40, Math.max(1, yi.size()) * 32), hj = Math.max(40, Math.max(1, ji.size()) * 32),
               top = 630 + (140 - hy - 12 - hj) / 2;
@@ -587,20 +632,20 @@ public final class Page {
             List<List<String>> lines = k == 0 ? yi : ji;
             float h = k == 0 ? hy : hj, box = top + (h - 40) / 2;
             String g = k == 0 ? "宜" : "忌";
-            rect(102, box, 142, box + 40, k == 0 ? BLACK : GDDD);
-            center(g, 122, base(box, 40, Ink.SERIF_BOLD, 24, g), Ink.SERIF_BOLD, 24, k == 0 ? WHITE : BLACK);
+            rect(102, box, 142, box + 40, k == 0 ? INK : TINT);
+            center(g, 122, base(box, 40, Ink.SERIF_BOLD, T_BODY, g), Ink.SERIF_BOLD, T_BODY, k == 0 ? PAPER : INK);
             float lt = top + (h - Math.max(1, lines.size()) * 32) / 2;
             for (int i = 0; i < lines.size(); i++) {
                 float wx = 184, y0 = lt + 32 * i;
                 for (String w : lines.get(i)) {
-                    float ww = width(w, Ink.SANS_MEDIUM, 22);
-                    text(w, wx, base(y0, 32, Ink.SANS_MEDIUM, 22, "宜"), Ink.SANS_MEDIUM, 22, BLACK);
-                    target(wx - 6, y0 - 6, wx + ww + 6, y0 + 38, "card:" + g + ":" + w);
+                    float ww = width(w, Ink.SANS_MEDIUM, T_BODY), padding = Math.max(6, (44 - ww) / 2);
+                    text(w, wx, base(y0, 32, Ink.SANS_MEDIUM, T_BODY, "宜"), Ink.SANS_MEDIUM, T_BODY, INK);
+                    target(wx - padding, y0 - 6, wx + ww + padding, y0 + 38, "card:" + g + ":" + w);
                     wx += ww + 12;
                 }
             }
             if (lines.isEmpty())
-                text("—", 184, base(lt, 32, Ink.SANS_MEDIUM, 22, "宜"), Ink.SANS_MEDIUM, 22, G444);
+                text("—", 184, base(lt, 32, Ink.SANS_MEDIUM, T_BODY, "宜"), Ink.SANS_MEDIUM, T_BODY, INK_2);
             top += h + 12;
         }
         if (viewState.card != null && !"节".equals(viewState.cardKind))
@@ -608,13 +653,13 @@ public final class Page {
     }
     private void terms(State viewState, long today) {
         title("节令", 807, viewState.selected == today ? null : "自 " + monthDay(viewState.selected) + "起");
-        rect(72, 859, 712, 862, BLACK);
+        hrule(72, 859, 712, RULE_TITLE, INK);
         List<Almanac.Upcoming> upcoming = almanac.upcoming(viewState.selected, 5);
         String when = null;
         for (int i = 0; i < upcoming.size(); i++) {
-            float top = 862 + 36 * i, b = i == 0 ? 0 : 2;
+            float top = 862 + 36 * i, b = i == 0 ? 0 : RULE_ROW;
             if (i > 0)
-                rect(72, top, 712, top + 2, BLACK);
+                hrule(72, top, 712, RULE_ROW, INK);
             Almanac.Upcoming entry = upcoming.get(i);
             String name = entry.name;
             String countdown;
@@ -625,13 +670,14 @@ public final class Page {
             } else {
                 countdown = entry.daysAhead + " 天";
             }
-            center(dot(entry.day), 122, base(top + b, 36 - b, Ink.INTER_MEDIUM, 22, "11"), Ink.INTER_MEDIUM, 22, BLACK);
-            text(name, 184, base(top + b, 36 - b, Ink.SANS_MEDIUM, 22, name), Ink.SANS_MEDIUM, 22, BLACK);
-            float y = base(top + b, 36 - b, Ink.INTER_SEMIBOLD, 18, countdown);
+            center(dot(entry.day), 122, base(top + b, 36 - b, Ink.INTER_MEDIUM, T_BODY, "11"), Ink.INTER_MEDIUM, T_BODY,
+                INK);
+            text(name, 184, base(top + b, 36 - b, Ink.SANS_MEDIUM, T_BODY, name), Ink.SANS_MEDIUM, T_BODY, INK);
+            float y = base(top + b, 36 - b, Ink.INTER_SEMIBOLD, T_CAPTION, countdown);
             if (entry.daysAhead <= 2)
-                center(countdown, 688, y, Ink.INTER_SEMIBOLD, 18, G444);
+                center(countdown, 688, y, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
             else
-                right(countdown, 712, y, Ink.INTER_SEMIBOLD, 18, G444);
+                right(countdown, 712, y, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
             target(72, top - 4, 712, top + 40, "card:节:" + name); // 44 px tall; the later row wins the overlap
             if (name.equals(viewState.card))
                 when = dot(entry.day) + "  " + countdown;
@@ -643,10 +689,10 @@ public final class Page {
     static final String[] MONTH_CN = {
         "", "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"};
     private void month(Object data, State viewState, long today) {
-        float titleBase = base(342, 52, Ink.SANS_BOLD, 28, "月");
-        float x = text(MONTH_CN[viewState.viewMonth], 778, titleBase, Ink.SANS_BOLD, 28, BLACK);
-        text(String.valueOf(viewState.viewYear), x + 14, titleBase, Ink.INTER_SEMIBOLD, 18, G444);
-        rect(778, 394, 1578, 397, BLACK);
+        float titleBase = base(342, 52, Ink.SANS_BOLD, T_TITLE, "月");
+        float x = text(MONTH_CN[viewState.viewMonth], 778, titleBase, Ink.SANS_BOLD, T_TITLE, INK);
+        text(String.valueOf(viewState.viewYear), x + 14, titleBase, Ink.INTER_SEMIBOLD, T_CAPTION, INK_2);
+        hrule(778, 394, 1578, RULE_TITLE, INK);
         String[][] navigation = {{"prev_year", "1310", "44", "M12 5l-7 7 7 7M20 5l-7 7 7 7"},
             {"prev_month", "1360", "44", "M15 5l-7 7 7 7"}, {"today", "1410", "68", null},
             {"next_month", "1484", "44", "M9 5l7 7-7 7"}, {"next_year", "1534", "44", "M4 5l7 7-7 7M12 5l7 7-7 7"}};
@@ -654,27 +700,27 @@ public final class Page {
         boolean atToday = viewState.selected == today && viewState.viewYear == t[0] && viewState.viewMonth == t[1];
         for (String[] button : navigation) {
             float left = Float.parseFloat(button[1]), buttonWidth = Float.parseFloat(button[2]);
-            rect(left, 346, left + buttonWidth, 390, GEEE);
+            rect(left, 346, left + buttonWidth, 390, FILL);
             if (button[3] != null)
-                icon(button[3], left + 10, 356, 1, 3, BLACK);
+                icon(button[3], left + 10, 356, 1, 3, INK);
             else {
-                center(
-                    "今天", left + buttonWidth / 2, base(346, 44, Ink.SANS_BOLD, 18, "今"), Ink.SANS_BOLD, 18, BLACK);
+                center("今天", left + buttonWidth / 2, base(346, 44, Ink.SANS_BOLD, T_CAPTION, "今"), Ink.SANS_BOLD,
+                    T_CAPTION, INK);
                 if (!atToday)
-                    rect(left, 346, left + buttonWidth, 350, BLACK);
+                    hrule(left, 346, left + buttonWidth, RULE_BLOCK, INK);
             }
             target(left, 346, left + buttonWidth, 390, button[0]);
         }
         int weekStart = Json.num(data, "weekStart") != null && Json.num(data, "weekStart") == 0 ? 0 : 1;
-        center("周", 802, base(397, 40, Ink.SANS_SEMIBOLD, 18, "周"), Ink.SANS_SEMIBOLD, 18, G444);
+        center("周", 802, base(397, 40, Ink.SANS_SEMIBOLD, T_CAPTION, "周"), Ink.SANS_SEMIBOLD, T_CAPTION, INK_2);
         float colW = (800 - 48 - 42) / 7f;
         for (int i = 0; i < 7; i++) {
             int wd = (weekStart + i) % 7;
             boolean weekend = wd == 0 || wd == 6;
             String h = ""
                 + "日一二三四五六".charAt(wd);
-            text(h, 832 + i * (colW + 6) + 12, base(397, 40, Ink.SANS_SEMIBOLD, 18, h),
-                weekend ? Ink.SANS_BOLD : Ink.SANS_SEMIBOLD, 18, weekend ? BLACK : G444);
+            text(h, 832 + i * (colW + 6) + 12, base(397, 40, Ink.SANS_SEMIBOLD, T_CAPTION, h),
+                weekend ? Ink.SANS_BOLD : Ink.SANS_SEMIBOLD, T_CAPTION, weekend ? INK : INK_2);
         }
         long first = Almanac.epochDay(viewState.viewYear, viewState.viewMonth, 1);
         int offset = (int) Almanac.mod(almanac.day(first).weekday() - weekStart, 7);
@@ -684,46 +730,46 @@ public final class Page {
             long thursday = rowStart + Almanac.mod(4 - almanac.day(rowStart).weekday(), 7);
             boolean current = today >= rowStart && today < rowStart + 7;
             String wk = String.valueOf(almanac.day(thursday).isoWeek());
-            center(wk, 802, base(top, 95, Ink.INTER_SEMIBOLD, 18, wk), current ? Ink.INTER_BOLD : Ink.INTER_SEMIBOLD,
-                18, current ? BLACK : G444);
+            center(wk, 802, base(top, 95, Ink.INTER_SEMIBOLD, T_CAPTION, wk), Ink.INTER_SEMIBOLD, T_CAPTION,
+                current ? INK : INK_2);
             for (int i = 0; i < 7; i++) {
                 Almanac.Day day = almanac.day(rowStart + i);
                 float l = 832 + i * (colW + 6), r = l + colW, b = top + 95;
                 boolean outsideMonth = day.month != viewState.viewMonth || day.year != viewState.viewYear,
                         isToday = day.epoch == today, selected = day.epoch == viewState.selected && !isToday;
                 boolean weekend = day.weekday() == 0 || day.weekday() == 6;
-                int background = WHITE;
+                int background = PAPER;
                 if (isToday) {
-                    background = BLACK;
+                    background = INK;
                 } else if (selected) {
-                    background = GDDD;
+                    background = TINT;
                 } else if (weekend && !outsideMonth) {
-                    background = GEEE;
+                    background = FILL;
                 }
                 rect(l, top, r, b, background);
-                float border = outsideMonth ? 2 : 3;
-                rect(l, top, r, top + border, outsideMonth ? GDDD : BLACK);
+                float border = outsideMonth ? RULE_ROW : RULE_TITLE;
+                hrule(l, top, r, border, outsideMonth ? TINT : INK);
                 if (selected) {
-                    rect(l, top, r, top + 3, BLACK);
-                    rect(l - 1, top - 1, r + 1, top, BLACK);
-                    rect(l - 1, b, r + 1, b + 1, BLACK);
-                    rect(l - 1, top, l, b, BLACK);
-                    rect(r, top, r + 1, b, BLACK);
+                    hrule(l, top, r, RULE_TITLE, INK);
+                    rect(l - 1, top - 1, r + 1, top, INK);
+                    rect(l - 1, b, r + 1, b + 1, INK);
+                    rect(l - 1, top, l, b, INK);
+                    rect(r, top, r + 1, b, INK);
                 }
-                int foreground = BLACK;
+                int foreground = INK;
                 if (isToday) {
-                    foreground = WHITE;
+                    foreground = PAPER;
                 } else if (outsideMonth) {
-                    foreground = G777;
+                    foreground = INK_3;
                 }
-                text(String.valueOf(day.day), l + 12, top + border + 45.5f, Ink.SERIF, 36, foreground);
+                text(String.valueOf(day.day), l + 12, top + border + 45.5f, Ink.SERIF, T_H3, foreground);
                 if (day.known) {
                     if (day.strong && !outsideMonth) {
-                        float tw = width(day.label, Ink.SANS_SEMIBOLD, 18);
-                        rect(l + 8, top + 59, l + 16 + tw, top + 85, selected ? WHITE : GCCC);
-                        text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, 18, BLACK);
+                        float tw = width(day.label, Ink.SANS_SEMIBOLD, T_CAPTION);
+                        rect(l + 8, top + 59, l + 16 + tw, top + 85, selected ? PAPER : TINT);
+                        text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, T_CAPTION, INK);
                     } else
-                        text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, 18, foreground);
+                        text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, T_CAPTION, foreground);
                 }
                 target(l, top, r, b, "date:" + day.epoch);
             }
@@ -822,16 +868,16 @@ public final class Page {
         float unit = size / 48f;
         if ("partlycloudy".equals(condition)) {
             for (int i = 0; i < paths.length - 1; i++)
-                ink.path(Svg.path(paths[i], left, top - unit, unit * 0.7f), -1, stroke * unit, BLACK, true);
+                ink.path(Svg.path(paths[i], left, top - unit, unit * 0.7f), -1, stroke * unit, INK, true);
             // The foreground cloud masks the lower rays/crescent instead of making the sky look overcast.
-            ink.path(Svg.path(CLOUD35, left, top, unit), WHITE, stroke * unit, BLACK, true);
+            ink.path(Svg.path(CLOUD35, left, top, unit), PAPER, stroke * unit, INK, true);
             return;
         }
         for (String p : paths)
-            icon(p, left, top, unit, stroke, BLACK);
+            icon(p, left, top, unit, stroke, INK);
     }
     static final String[] AQI_NAMES = {"优", "良", "轻度污染", "中度污染", "重度污染", "严重污染"};
-    static final int[] AQI_BG = {GEEE, GDDD, GBBB, G777, G444, BLACK};
+    static final int[] AQI_BG = DATA;
 
     private static int aqiLevel(double value) {
         if (value <= 50)
@@ -862,45 +908,46 @@ public final class Page {
     private void weather(Object data, String nowClock) {
         Map<String, Object> weather = Json.obj(data, "weather");
         String sunrise = Json.str(weather, "sunrise"), sunset = Json.str(weather, "sunset");
-        rect(72, 1074, 1578, 1078, BLACK);
-        text("天气", 72, base(1078, 52, Ink.SANS_BOLD, 28, "天"), Ink.SANS_BOLD, 28, BLACK);
+        hrule(72, 1074, 1578, RULE_BLOCK, INK);
+        text("天气", 72, base(1078, 52, Ink.SANS_BOLD, T_TITLE, "天"), Ink.SANS_BOLD, T_TITLE, INK);
         String city = Json.str(data, "city");
         if (city != null)
-            text(city, 142, base(1078, 52, Ink.SANS_SEMIBOLD, 18, city), Ink.SANS_SEMIBOLD, 18, G444);
-        float tx = tracked(one(Json.num(weather, "temp")), 72, 1249.5f, Ink.SERIF, 112, BLACK, -4);
-        text("°C", tx + 8, 1196.5f, Ink.SERIF, 40, BLACK);
+            text(city, 142, base(1078, 52, Ink.SANS_SEMIBOLD, T_CAPTION, city), Ink.SANS_SEMIBOLD, T_CAPTION, INK_2);
+        float tx = tracked(one(Json.num(weather, "temp")), 72, 1249.5f, Ink.SERIF, T_DISPLAY, INK, -4);
+        text("°C", tx + 8, 1196.5f, Ink.SERIF, T_H3, INK);
         Double humidity = Json.num(weather, "humidity");
-        float hl = right(humidity == null ? "—" : whole(humidity) + "%", 512, 1249.5f, Ink.INTER_SEMIBOLD, 26, BLACK);
-        right("湿度", hl - 8, 1249.5f, Ink.SANS_SEMIBOLD, 18, G444);
+        float hl =
+            right(humidity == null ? "—" : whole(humidity) + "%", 512, 1249.5f, Ink.INTER_SEMIBOLD, T_TITLE, INK);
+        right("湿度", hl - 8, 1249.5f, Ink.SANS_SEMIBOLD, T_CAPTION, INK_2);
         String condition = Json.str(weather, "condition");
         weatherGlyph(condition, 72, 1279, 48, 1.8f, nightAt(nowClock, sunrise, sunset));
-        text(conditionName(condition), 134, base(1279, 48, Ink.SANS_BOLD, 32, "多"), Ink.SANS_BOLD, 32, BLACK);
+        text(conditionName(condition), 134, base(1279, 48, Ink.SANS_BOLD, T_H3, "多"), Ink.SANS_BOLD, T_H3, INK);
         Double aqi = Json.num(weather, "aqi");
         float vr = 512;
         if (aqi != null) {
             int level = aqiLevel(aqi);
             rect(436, 1290, 512, 1316, AQI_BG[level]);
-            center(AQI_NAMES[level], 474, base(1290, 26, Ink.SANS_SEMIBOLD, 16, "优"), Ink.SANS_SEMIBOLD, 16,
-                level >= 3 ? WHITE : BLACK);
+            center(AQI_NAMES[level], 474, base(1290, 26, Ink.SANS_SEMIBOLD, T_MICRO, "优"), Ink.SANS_SEMIBOLD, T_MICRO,
+                level >= 3 ? PAPER : INK);
             vr = 422;
         }
-        float al = right(aqi == null ? "—" : whole(aqi), vr, 1312.25f, Ink.INTER_SEMIBOLD, 26, BLACK);
-        right("AQI", al - 6, 1310, Ink.SANS_SEMIBOLD, 16, G444);
-        rect(72, 1356, 512, 1358, BLACK);
+        float al = right(aqi == null ? "—" : whole(aqi), vr, 1312.25f, Ink.INTER_SEMIBOLD, T_TITLE, INK);
+        right("AQI", al - 6, 1310, Ink.SANS_SEMIBOLD, T_MICRO, INK_2);
+        hrule(72, 1356, 512, RULE_ROW, INK);
         String[] labels = {"日出", "日落", "明天"};
         float[] cols = {72, 218.67f, 365.33f};
         for (int i = 0; i < 3; i++)
-            text(labels[i], cols[i], 1399, Ink.SANS_SEMIBOLD, 18, G444);
-        text(sunrise == null ? "—" : sunrise, 72, 1433, Ink.INTER_SEMIBOLD, 26, BLACK);
-        text(sunset == null ? "—" : sunset, 218.67f, 1433, Ink.INTER_SEMIBOLD, 26, BLACK);
+            text(labels[i], cols[i], 1399, Ink.SANS_SEMIBOLD, T_CAPTION, INK_2);
+        text(sunrise == null ? "—" : sunrise, 72, 1433, Ink.INTER_SEMIBOLD, T_TITLE, INK);
+        text(sunset == null ? "—" : sunset, 218.67f, 1433, Ink.INTER_SEMIBOLD, T_TITLE, INK);
         Map<String, Object> tomorrow = Json.obj(weather, "tomorrow");
         if (Json.num(tomorrow, "low") != null || Json.num(tomorrow, "high") != null) {
             weatherGlyph(Json.str(tomorrow, "condition"), 365.33f, 1408, 38, 2.2f, false);
             float x = text(whole(Json.num(tomorrow, "low")) + "～" + whole(Json.num(tomorrow, "high")), 413.33f,
-                1438.25f, Ink.INTER_SEMIBOLD, 26, BLACK);
-            text(" °C", x, 1438.25f, Ink.INTER_SEMIBOLD, 18, BLACK);
+                1438.25f, Ink.INTER_SEMIBOLD, T_TITLE, INK);
+            text(" °C", x, 1438.25f, Ink.INTER_SEMIBOLD, T_CAPTION, INK);
         } else
-            text("—", 365.33f, 1433, Ink.INTER_SEMIBOLD, 26, BLACK);
+            text("—", 365.33f, 1433, Ink.INTER_SEMIBOLD, T_TITLE, INK);
 
         // Six hours: time, icon, the 1000 x 140 temperature chart at y 1218, chance of rain, wind arrow and force.
         List<Object> hourly = Json.list(weather, "hourly");
@@ -924,7 +971,7 @@ public final class Page {
             float cx = 578 + columnWidth * i + columnWidth / 2;
             String time = Json.str(hour, "time");
             if (time != null)
-                center(time, cx, 1149.5f, Ink.INTER_MEDIUM, 20, BLACK);
+                center(time, cx, 1149.5f, Ink.INTER_SEMIBOLD, T_CAPTION, INK);
             weatherGlyph(Json.str(hour, "condition"), cx - 24, 1164, 48, 1.8f, nightAt(time, sunrise, sunset));
             Double temperature = Json.num(hour, "temp");
             if (temperature != null) {
@@ -934,15 +981,16 @@ public final class Page {
             }
             Double precipitationChance = Json.num(hour, "pop");
             if (precipitationChance != null && precipitationChance >= POP_SHOWN)
-                center(Math.round(Math.min(100, precipitationChance)) + "%", cx, 1381.5f, Ink.INTER_MEDIUM, 20, BLACK);
+                center(Math.round(Math.min(100, precipitationChance)) + "%", cx, 1381.5f, Ink.INTER_SEMIBOLD, T_CAPTION,
+                    INK);
             Double windSpeed = Json.num(hour, "wind"), windBearing = Json.num(hour, "bearing");
             if (windBearing != null) { // the arrow points where the wind blows to
                 ink.turn((float) (windBearing + 180), cx, 1402);
-                icon("M12 20V5M6 10l6-6 6 6", cx - 12, 1390, 1, 2.2f, BLACK);
+                icon("M12 20V5M6 10l6-6 6 6", cx - 12, 1390, 1, 2.2f, INK);
                 ink.unturn();
             }
             if (windSpeed != null)
-                center(windName(windSpeed), cx, 1441, Ink.SANS_MEDIUM, 20, BLACK);
+                center(windName(windSpeed), cx, 1441, Ink.SANS_SEMIBOLD, T_CAPTION, INK);
         }
         // Area, axis, line, hollow points and labels.
         List<float[]> segmentPoints = new ArrayList<>();
@@ -966,60 +1014,96 @@ public final class Page {
                 area[k++] = segmentPoints.get(0)[0];
                 area[k++] = chartTop + 138;
                 area[k] = Ink.CLOSE;
-                ink.path(area, GEEE, 0, -1, false);
+                ink.path(area, FILL, 0, -1, false);
             }
             segmentPoints.clear();
         }
-        rect(578, chartTop + 138, 1578, chartTop + 140, BLACK);
+        hrule(578, chartTop + 138, 1578, RULE_ROW, INK);
         for (int i = 0; i + 1 < hourCount; i++)
             if (hasTemperature[i] && hasTemperature[i + 1])
-                ink.line(pointX[i], pointY[i], pointX[i + 1], pointY[i + 1], 4, BLACK, 0, 0);
+                ink.line(pointX[i], pointY[i], pointX[i + 1], pointY[i + 1], 4, INK, 0, 0);
         for (int i = 0; i < hourCount; i++)
             if (hasTemperature[i]) {
-                ink.circle(pointX[i], pointY[i], 6, WHITE, 3, BLACK);
-                center(whole(Json.num(hourly.get(i), "temp")) + "°", pointX[i], pointY[i] - 12, Ink.SERIF, 26, BLACK);
+                ink.circle(pointX[i], pointY[i], 6, PAPER, 3, INK);
+                center(
+                    whole(Json.num(hourly.get(i), "temp")) + "°", pointX[i], pointY[i] - 12, Ink.SERIF, T_TITLE, INK);
             }
     }
 
     // ---------------------------------------------------------------- indoor
     static final String MINUS = "M5 12h14", PLUS = "M5 12h14M12 5v14";
-    private void indoor(Object data) {
-        Map<String, Object> rooms = Json.obj(data, "indoor");
-        rect(72, 1473, 1578, 1477, BLACK);
-        rect(574, 1477, 576, 1625, BLACK);
-        rect(975.6f, 1477, 977.6f, 1625, BLACK);
-        String[] roomNames = {"客厅", "卧室"};
-        String[] roomKeys = {"living", "bedroom"};
-        float[] xs = {72, 596};
-        for (int i = 0; i < 2; i++) {
-            Map<String, Object> room = Json.obj(rooms, roomKeys[i]);
-            text(roomNames[i], xs[i], 1511.25f, Ink.SANS_MEDIUM, 26, BLACK);
-            Double temperature = Json.num(room, "temp"), humidity = Json.num(room, "humidity");
-            float x = text(temperature == null ? "—" : one(temperature) + "°", xs[i], 1606.25f, Ink.SERIF, 72, BLACK);
-            text("湿度 " + (humidity == null ? "—" : trim(humidity) + "%"), x + 18, 1606.25f, Ink.INTER_MEDIUM, 22,
-                BLACK);
+    private void rooms(Object data) {
+        boolean configured = data instanceof Map && ((Map<?, ?>) data).get("rooms") instanceof List;
+        List<Object> rooms = Json.list(data, "rooms");
+        int count = Math.min(6, configured ? rooms.size() : 2), columns = count <= 3 ? count : count == 4 ? 2 : 3,
+            rows = count <= 3 ? 1 : 2;
+        if (count == 2)
+            vrule(574, 1477, 1625, RULE_ROW, INK);
+        else if (count > 2) {
+            for (int column = 1; column < columns; column++)
+                vrule(72 + column * 903.6f / columns, 1477, 1625, RULE_ROW, INK);
+            if (rows == 2)
+                hrule(72, 1551, 975.6f, RULE_ROW, INK);
         }
+        for (int i = 0; i < count; i++) {
+            Object room = configured ? rooms.get(i) : Json.obj(Json.obj(data, "indoor"), i == 0 ? "living" : "bedroom");
+            String name = configured ? Json.str(room, "name") : i == 0 ? "客厅" : "卧室";
+            Double temperature = Json.num(room, "temp"), humidity = Json.num(room, "humidity");
+            String reading = temperature == null ? "—" : one(temperature) + "°",
+                   moisture = "湿度 " + (humidity == null ? "—" : trim(humidity) + "%");
+            if (count <= 2) {
+                float left = i == 0 ? 72 : 596, right = count == 1 ? 975.6f : i == 0 ? 574 : 975.6f;
+                text(fit(name, right - left - 18, Ink.SANS_MEDIUM, T_TITLE), left, 1511.25f,
+                    Ink.SANS_MEDIUM, T_TITLE, INK);
+                float x = text(fit(reading, right - left - 180, Ink.SERIF, T_H1), left, 1606.25f, Ink.SERIF, T_H1, INK);
+                text(fit(moisture, right - x - 28, Ink.INTER_MEDIUM, T_BODY), x + 18, 1606.25f,
+                    Ink.INTER_MEDIUM, T_BODY, INK);
+            } else {
+                int column = i % columns;
+                float left = 72 + column * 903.6f / columns + (column == 0 ? 0 : 16),
+                      right = 72 + (column + 1) * 903.6f / columns - 16, top = 1477 + (i / columns) * 74;
+                float nameSize = rows == 1 ? T_TITLE : T_BODY;
+                text(fit(name, right - left, Ink.SANS_MEDIUM, nameSize), left, top + (rows == 1 ? 34.25f : 24),
+                    Ink.SANS_MEDIUM, nameSize, INK);
+                if (rows == 1) {
+                    text(fit(reading, right - left, Ink.SERIF, T_H2), left, 1575, Ink.SERIF, T_H2, INK);
+                    text(fit(moisture, right - left, Ink.INTER_MEDIUM, T_CAPTION), left, 1606.25f,
+                        Ink.INTER_MEDIUM, T_CAPTION, INK);
+                } else {
+                    float humidityWidth = Math.min((right - left) / 2, width(moisture, Ink.INTER_MEDIUM, T_CAPTION));
+                    text(fit(reading, right - left - humidityWidth - 12, Ink.SERIF, T_H3), left, top + 63,
+                        Ink.SERIF, T_H3, INK);
+                    right(fit(moisture, humidityWidth, Ink.INTER_MEDIUM, T_CAPTION), right, top + 63,
+                        Ink.INTER_MEDIUM, T_CAPTION, INK);
+                }
+            }
+        }
+    }
+    private void indoor(Object data) {
+        hrule(72, 1473, 1578, RULE_BLOCK, INK);
+        vrule(975.6f, 1477, 1625, RULE_ROW, INK);
+        rooms(data);
         Map<String, Object> climate = Json.obj(data, "ac");
         boolean climateAvailable = Json.bool(climate, "available");
         String mode = Json.str(climate, "mode"), hvacAction = Json.str(climate, "action");
         List<Object> modes = Json.list(climate, "modes");
-        text("空调", 997.6f, 1523.25f, Ink.SANS_MEDIUM, 26, BLACK);
+        text("空调", 997.6f, 1523.25f, Ink.SANS_MEDIUM, T_TITLE, INK);
         String[][] modeButtons = {{"heat", "制热"}, {"cool", "制冷"}, {"heat_cool", "区间"}, {"off", "停机"}};
         for (int i = 0; i < 4; i++) {
             float l = 1342 + 60 * i;
             boolean selectedMode = modeButtons[i][0].equals(mode),
                     modeAvailable = climateAvailable && modes.contains(modeButtons[i][0]);
-            rect(l, 1490, l + 56, 1534, GEEE);
+            rect(l, 1490, l + 56, 1534, FILL);
             if (selectedMode)
-                rect(l, 1490, l + 56, 1494, BLACK);
-            int buttonColor = GBBB;
+                hrule(l, 1490, l + 56, RULE_BLOCK, INK);
+            int buttonColor = INK_3;
             if (selectedMode) {
-                buttonColor = BLACK;
+                buttonColor = INK;
             } else if (modeAvailable) {
-                buttonColor = G444;
+                buttonColor = INK_2;
             }
-            center(modeButtons[i][1], l + 28, base(1490, 44, Ink.SANS_SEMIBOLD, 18, "制"),
-                selectedMode ? Ink.SANS_BOLD : Ink.SANS_SEMIBOLD, 18, buttonColor);
+            center(modeButtons[i][1], l + 28, base(1490, 44, Ink.SANS_SEMIBOLD, T_CAPTION, "制"),
+                selectedMode ? Ink.SANS_BOLD : Ink.SANS_SEMIBOLD, T_CAPTION, buttonColor);
             if (modeAvailable && !selectedMode)
                 target(l, 1490, l + 56, 1534, "mode:" + modeButtons[i][0]);
         }
@@ -1040,12 +1124,13 @@ public final class Page {
             statusText = "正在调温";
         }
         if (climateAvailable && statusText != null && (pendingMark != null || !"off".equals(mode))) {
-            float statusWidth = width(statusText, Ink.SANS_SEMIBOLD, 15);
-            rect(1021.6f - statusWidth / 2 - 8, 1477, 1021.6f + statusWidth / 2 + 8, 1497, GEEE);
-            center(statusText, 1021.6f, base(1477, 20, Ink.SANS_SEMIBOLD, 15, statusText), Ink.SANS_SEMIBOLD, 15, G333);
+            float statusWidth = width(statusText, Ink.SANS_SEMIBOLD, T_MICRO);
+            rect(1021.6f - statusWidth / 2 - 8, 1477, 1021.6f + statusWidth / 2 + 8, 1497, TINT);
+            center(statusText, 1021.6f, base(1477, 20, Ink.SANS_SEMIBOLD, T_MICRO, statusText), Ink.SANS_SEMIBOLD,
+                T_MICRO, INK_2);
         }
         if (!climateAvailable || mode == null) {
-            text("—", 997.6f, 1607, Ink.SERIF, 72, G999);
+            text("—", 997.6f, 1607, Ink.SERIF, T_H1, INK_3);
             return;
         }
         boolean missingTarget;
@@ -1055,52 +1140,52 @@ public final class Page {
             missingTarget = !"off".equals(mode) && Json.num(climate, "target") == null;
         }
         if (missingTarget) {
-            text("—", 997.6f, 1607, Ink.SERIF, 72, G999);
+            text("—", 997.6f, 1607, Ink.SERIF, T_H1, INK_3);
             return;
         }
         if ("heat_cool".equals(mode)) {
-            float baseline = base(1540, 72, Ink.SERIF, 48, "1"), buttonsTop = 1554;
+            float baseline = base(1540, 72, Ink.SERIF, T_H2, "1"), buttonsTop = 1554;
             String lowText = one(Json.num(climate, "low")) + "°", highText = one(Json.num(climate, "high")) + "°";
             float x = 997.6f;
-            rect(x, buttonsTop, x + 36, buttonsTop + 44, GEEE);
-            icon(MINUS, x + 9, buttonsTop + 13, 0.75f, 2.4f, BLACK);
-            target(x, buttonsTop, x + 36, buttonsTop + 44, "range_low_down");
-            x = text(lowText, x + 40, baseline, Ink.SERIF, 48, BLACK) + 4;
-            rect(x, buttonsTop, x + 36, buttonsTop + 44, GEEE);
-            icon(PLUS, x + 9, buttonsTop + 13, 0.75f, 2.4f, BLACK);
-            target(x, buttonsTop, x + 36, buttonsTop + 44, "range_low_up");
-            float lowRight = x + 36, highWidth = width(highText, Ink.SERIF, 48),
-                  highLeft = 1578 - 36 - 4 - highWidth - 4 - 36;
-            rect(highLeft, buttonsTop, highLeft + 36, buttonsTop + 44, GEEE);
-            icon(MINUS, highLeft + 9, buttonsTop + 13, 0.75f, 2.4f, BLACK);
-            target(highLeft, buttonsTop, highLeft + 36, buttonsTop + 44, "range_high_down");
-            text(highText, highLeft + 40, baseline, Ink.SERIF, 48, BLACK);
-            rect(1542, buttonsTop, 1578, buttonsTop + 44, GEEE);
-            icon(PLUS, 1551, buttonsTop + 13, 0.75f, 2.4f, BLACK);
-            target(1542, buttonsTop, 1578, buttonsTop + 44, "range_high_up");
-            center(
-                "～", (lowRight + highLeft) / 2, base(1540, 72, Ink.SANS_MEDIUM, 32, "～"), Ink.SANS_MEDIUM, 32, G777);
+            rect(x, buttonsTop, x + 44, buttonsTop + 44, FILL);
+            icon(MINUS, x + 13, buttonsTop + 13, 0.75f, 2.4f, INK);
+            target(x, buttonsTop, x + 44, buttonsTop + 44, "range_low_down");
+            x = text(lowText, x + 48, baseline, Ink.SERIF, T_H2, INK) + 4;
+            rect(x, buttonsTop, x + 44, buttonsTop + 44, FILL);
+            icon(PLUS, x + 13, buttonsTop + 13, 0.75f, 2.4f, INK);
+            target(x, buttonsTop, x + 44, buttonsTop + 44, "range_low_up");
+            float lowRight = x + 44, highWidth = width(highText, Ink.SERIF, T_H2),
+                  highLeft = 1578 - 44 - 4 - highWidth - 4 - 44;
+            rect(highLeft, buttonsTop, highLeft + 44, buttonsTop + 44, FILL);
+            icon(MINUS, highLeft + 13, buttonsTop + 13, 0.75f, 2.4f, INK);
+            target(highLeft, buttonsTop, highLeft + 44, buttonsTop + 44, "range_high_down");
+            text(highText, highLeft + 48, baseline, Ink.SERIF, T_H2, INK);
+            rect(1534, buttonsTop, 1578, buttonsTop + 44, FILL);
+            icon(PLUS, 1547, buttonsTop + 13, 0.75f, 2.4f, INK);
+            target(1534, buttonsTop, 1578, buttonsTop + 44, "range_high_up");
+            center("～", (lowRight + highLeft) / 2, base(1540, 72, Ink.SANS_MEDIUM, T_H3, "～"), Ink.SANS_MEDIUM, T_H3,
+                INK_3);
         } else if ("off".equals(mode))
-            text("—", 997.6f, 1607, Ink.SERIF, 72, G999);
+            text("—", 997.6f, 1607, Ink.SERIF, T_H1, INK_3);
         else {
-            text(one(Json.num(climate, "target")) + "°", 997.6f, 1607, Ink.SERIF, 72, BLACK);
-            rect(1466, 1556, 1518, 1608, GEEE);
-            icon(MINUS, 1480, 1570, 1, 2.4f, BLACK);
+            text(one(Json.num(climate, "target")) + "°", 997.6f, 1607, Ink.SERIF, T_H1, INK);
+            rect(1466, 1556, 1518, 1608, FILL);
+            icon(MINUS, 1480, 1570, 1, 2.4f, INK);
             target(1466, 1556, 1518, 1608, "temp_down");
-            rect(1526, 1556, 1578, 1608, GEEE);
-            icon(PLUS, 1540, 1570, 1, 2.4f, BLACK);
+            rect(1526, 1556, 1578, 1608, FILL);
+            icon(PLUS, 1540, 1570, 1, 2.4f, INK);
             target(1526, 1556, 1578, 1608, "temp_up");
         }
     }
 
     private void air(Object data, long now, TimeZone zone) {
         Map<String, Object> indoor = Json.obj(data, "indoor");
-        rect(72, 1625, 1578, 1627, BLACK);
+        hrule(72, 1625, 1578, RULE_ROW, INK);
         // CO2: value, grade and the 24 hour trend (330 x 88 at 222, 1653; curve 18-324, 400-2000 ppm over 84 px).
-        text("CO₂", 72, 1658.5f, Ink.INTER_SEMIBOLD, 18, BLACK);
+        text("CO₂", 72, 1658.5f, Ink.INTER_SEMIBOLD, T_CAPTION, INK);
         Double co2 = Json.num(indoor, "co2");
-        float x = text(whole(co2), 72, 1712, Ink.SERIF, 44, BLACK);
-        text("ppm", x + 8, 1712, Ink.INTER_SEMIBOLD, 16, BLACK);
+        float x = text(whole(co2), 72, 1712, Ink.SERIF, T_H2, INK);
+        text("ppm", x + 8, 1712, Ink.INTER_SEMIBOLD, T_MICRO, INK);
         if (co2 != null) {
             String co2Grade = "良好";
             if (co2 > 1500) {
@@ -1109,11 +1194,11 @@ public final class Page {
                 co2Grade = "偏高";
             }
             if (co2 > 1500) {
-                float w = width(co2Grade, Ink.INTER_SEMIBOLD, 16);
-                rect(72, 1753, 72 + w + 12, 1771, BLACK);
-                text(co2Grade, 78, 1767.5f, Ink.INTER_SEMIBOLD, 16, WHITE);
+                float w = width(co2Grade, Ink.INTER_SEMIBOLD, T_MICRO);
+                rect(72, 1753, 72 + w + 12, 1771, INK);
+                text(co2Grade, 78, 1767.5f, Ink.INTER_SEMIBOLD, T_MICRO, PAPER);
             } else
-                text(co2Grade, 72, 1767.5f, Ink.INTER_SEMIBOLD, 16, co2 > 1000 ? BLACK : G444);
+                text(co2Grade, 72, 1767.5f, Ink.INTER_SEMIBOLD, T_MICRO, co2 > 1000 ? INK : INK_2);
         }
         float chartLeft = 222, chartTop = 1653;
         List<Object> co2History = Json.list(indoor, "co2History");
@@ -1159,24 +1244,25 @@ public final class Page {
             area[k++] = sampleX[startIndex];
             area[k++] = chartTop + 87;
             area[k] = Ink.CLOSE;
-            ink.path(area, GEEE, 0, -1, false);
+            ink.path(area, FILL, 0, -1, false);
             ink.clip(chartLeft, chartTop, chartLeft + 330, chartTop + 54.5f);
-            ink.path(area, GAAA, 0, -1, false);
+            ink.path(area, DATA[2], 0, -1, false); // over the 1000 ppm line
             ink.unclip();
         }
-        ink.line(chartLeft + 18, chartTop + 54.5f, chartLeft + 324, chartTop + 54.5f, 2, BLACK, 6, 5);
+        ink.line(chartLeft + 18, chartTop + 54.5f, chartLeft + 324, chartTop + 54.5f, 2, INK, 6, 5);
         // The 1000 ppm label reads upward beside the dashed line (SVG rotate(-90), dominant-baseline central).
         ink.turn(-90, chartLeft + 8, chartTop + 54.5f);
-        center("1000", chartLeft + 8, chartTop + 54.5f + (0.96875f - 0.2412f) / 2 * 14, Ink.INTER_SEMIBOLD, 14, G444);
+        center("1000", chartLeft + 8, chartTop + 54.5f + (0.96875f - 0.2412f) / 2 * T_MICRO, Ink.INTER_SEMIBOLD,
+            T_MICRO, INK_2);
         ink.unturn();
-        rect(chartLeft + 18, chartTop + 86, chartLeft + 324, chartTop + 88, BLACK);
+        hrule(chartLeft + 18, chartTop + 86, chartLeft + 324, RULE_ROW, INK);
         for (float[] segment : segments) {
             int startIndex = (int) segment[0], endIndex = (int) segment[1];
             for (int i = startIndex; i + 1 < endIndex; i++)
-                ink.line(sampleX[i], sampleY[i], sampleX[i + 1], sampleY[i + 1], 2, BLACK, 0, 0);
+                ink.line(sampleX[i], sampleY[i], sampleX[i + 1], sampleY[i + 1], 2, INK, 0, 0);
         }
         if (sampleCount > 0 && hasSample[sampleCount - 1])
-            ink.circle(chartLeft + 324, sampleY[sampleCount - 1], 5, BLACK, 0, -1);
+            ink.circle(chartLeft + 324, sampleY[sampleCount - 1], 5, INK, 0, -1);
         Double historyEnd = Json.num(indoor, "co2End");
         long end = historyEnd == null ? now : historyEnd.longValue(), start = end - 86400000L;
         Calendar cal = Calendar.getInstance(zone);
@@ -1194,32 +1280,32 @@ public final class Page {
             float tx = 18 + 306f * (t - start) / 86400000f;
             if (tx > 324 - 34 || tx < 28)
                 continue;
-            center(two(hour), chartLeft + tx, tickY, Ink.INTER_SEMIBOLD, 15, G444);
+            center(two(hour), chartLeft + tx, tickY, Ink.INTER_SEMIBOLD, T_MICRO, INK_2);
         }
-        center("现在", chartLeft + 324, tickY, Ink.INTER_SEMIBOLD, 15, G444);
+        center("现在", chartLeft + 324, tickY, Ink.INTER_SEMIBOLD, T_MICRO, INK_2);
         // Five particulate/gas columns: value, scale bar (safe zone, limit line, diamond) and grade.
         String[][] pollutants = {{"PM2.5", "pm25", "50", "µg/m³", "50"}, {"PM10", "pm10", "100", "µg/m³", "100"},
             {"PM1", "pm1", "15", "µg/m³", "15"}, {"甲醛", "hcho", "0.08", "mg/m³", "0.08"},
             {"TVOC", "tvoc", "0.6", "mg/m³", "0.60"}};
         for (int i = 0; i < 5; i++) {
             float colL = 574 + 200.8f * i, l = colL + 22, w = i == 4 ? 178.8f : 158.8f;
-            rect(colL, 1627, colL + 2, 1805, BLACK);
-            text(pollutants[i][0], l, 1658.5f, Ink.INTER_SEMIBOLD, 18, BLACK);
+            vrule(colL, 1627, 1805, RULE_ROW, INK);
+            text(pollutants[i][0], l, 1658.5f, Ink.INTER_SEMIBOLD, T_CAPTION, INK);
             Double pollutantValue = Json.num(indoor, pollutants[i][1]);
             double limit = Double.parseDouble(pollutants[i][2]);
             String valueText = i < 3 ? whole(pollutantValue) : milli(pollutantValue);
-            float vx = text(valueText, l, 1712, Ink.SERIF, 44, BLACK);
-            text(pollutants[i][3], vx + 8, 1712, Ink.INTER_SEMIBOLD, 16, BLACK);
+            float vx = text(valueText, l, 1712, Ink.SERIF, T_H2, INK);
+            text(pollutants[i][3], vx + 8, 1712, Ink.INTER_SEMIBOLD, T_MICRO, INK);
             float lim = l + w * 0.667f;
-            rect(l, 1731, lim, 1739, GDDD);
-            rect(l, 1739, l + w, 1741, BLACK);
-            rect(lim, 1727, lim + 2, 1739, BLACK);
-            center(pollutants[i][4], lim + 1, 1757, Ink.INTER_SEMIBOLD, 15, G444);
+            rect(l, 1731, lim, 1739, TINT);
+            hrule(l, 1739, l + w, RULE_ROW, INK);
+            vrule(lim, 1727, 1739, RULE_ROW, INK);
+            center(pollutants[i][4], lim + 1, 1757, Ink.INTER_SEMIBOLD, T_MICRO, INK_2);
             if (pollutantValue != null) {
                 float pos = l + w * (float) Math.min(1, Math.max(0, pollutantValue / (limit * 1.5)));
                 ink.path(new float[] {Ink.MOVE, pos, 1732.93f, Ink.LINE, pos + 7.07f, 1740, Ink.LINE, pos, 1747.07f,
                              Ink.LINE, pos - 7.07f, 1740, Ink.CLOSE},
-                    BLACK, 0, -1, false);
+                    INK, 0, -1, false);
                 String grade;
                 if (pollutantValue <= limit / 2) {
                     grade = "优";
@@ -1228,14 +1314,14 @@ public final class Page {
                 } else {
                     grade = "超标";
                 }
-                text(grade, l, 1767.5f, Ink.INTER_SEMIBOLD, 16, pollutantValue > limit ? BLACK : G444);
+                text(grade, l, 1767.5f, Ink.INTER_SEMIBOLD, T_MICRO, pollutantValue > limit ? INK : INK_2);
             }
         }
     }
 
     /** Up to four hint lines beside a quote mark, or beside the 128 x 128 icon the App fetched from HA. */
     private void hint(Object data, byte[] icon, boolean armed) {
-        rect(72, 1805, 1578, 1809, BLACK);
+        hrule(72, 1805, 1578, RULE_BLOCK, INK);
         List<String> lines = new ArrayList<>();
         for (Object o : Json.list(Json.obj(data, "assistant"), "lines"))
             if (o instanceof String && !((String) o).trim().isEmpty() && lines.size() < 4)
@@ -1246,40 +1332,45 @@ public final class Page {
               iconTop = 1834 + (contentHeight - 128) / 2;
         // Tap once: 确认更新 (5 s); tap again: 更新中 until the server settles the "assistant" request.
         if (mark(data, "assistant") != null) {
-            rect(74, iconTop, 202, iconTop + 128, BLACK);
-            center("更新中", 138, base(iconTop, 128, Ink.SERIF_BOLD, 34, "更"), Ink.SERIF_BOLD, 34, WHITE);
+            rect(74, iconTop, 202, iconTop + 128, INK);
+            center("更新中", 138, base(iconTop, 128, Ink.SERIF_BOLD, T_H3, "更"), Ink.SERIF_BOLD, T_H3, PAPER);
         } else if (armed) {
-            rect(74, iconTop, 202, iconTop + 128, GEEE);
-            rect(74, iconTop, 202, iconTop + 4, BLACK);
-            center("确认", 138, base(iconTop + 29, 34, Ink.SERIF_BOLD, 34, "确"), Ink.SERIF_BOLD, 34, BLACK);
-            center("更新", 138, base(iconTop + 69, 34, Ink.SERIF_BOLD, 34, "更"), Ink.SERIF_BOLD, 34, BLACK);
+            rect(74, iconTop, 202, iconTop + 128, FILL);
+            hrule(74, iconTop, 202, RULE_BLOCK, INK);
+            center("确认", 138, base(iconTop + 29, 34, Ink.SERIF_BOLD, T_H3, "确"), Ink.SERIF_BOLD, T_H3, INK);
+            center("更新", 138, base(iconTop + 69, 34, Ink.SERIF_BOLD, T_H3, "更"), Ink.SERIF_BOLD, T_H3, INK);
         } else if (icon != null && icon.length == 128 * 128)
             ink.gray(icon, 128, 74, iconTop);
         else
-            center("“", 138, iconTop + 151.5f, Ink.SERIF_LATIN_BOLD, 154, BLACK);
+            center("“", 138, iconTop + 151.5f, Ink.SERIF_LATIN_BOLD, QUOTE_GLYPH, INK);
         target(72, iconTop, 204, iconTop + 128, "hint");
-        rect(204, 1834, 206, 1834 + contentHeight, BLACK);
+        vrule(204, 1834, 1834 + contentHeight, RULE_ROW, INK);
         for (int i = 0; i < lineCount; i++)
-            text(fit(lines.get(i), 1352, Ink.SANS_MEDIUM, 26), 226,
-                base(textTop + 43 * i, 39, Ink.SANS_MEDIUM, 26, "日"), Ink.SANS_MEDIUM, 26, BLACK);
+            text(fit(lines.get(i), 1352, Ink.SANS_MEDIUM, T_TITLE), 226,
+                base(textTop + 43 * i, 39, Ink.SANS_MEDIUM, T_TITLE, "日"), Ink.SANS_MEDIUM, T_TITLE, INK);
     }
 
     private void devices(Object data) {
         List<Object> devices = Json.list(data, "devices");
-        float cardWidth = (1506 - 32) / 3f;
-        for (int i = 0; i < 3; i++) {
-            float left = 72 + i * (cardWidth + 16);
-            rect(left, 2034, left + cardWidth, 2144, GEEE);
-            if (i >= devices.size())
-                continue;
+        int count = Math.min(8, devices.size()), columns = Math.min(4, count), rows = count > 4 ? 2 : 1;
+        if (count == 0)
+            return;
+        float cardWidth = (1506 - (columns - 1) * 16) / columns, cardHeight = (110 - (rows - 1) * 12) / rows;
+        for (int i = 0; i < count; i++) {
+            float left = 72 + (i % columns) * (cardWidth + 16), top = 2034 + (i / columns) * (cardHeight + 12),
+                  padding = rows == 1 ? 24 : 12, nameSize = rows == 1 ? T_TITLE : T_CAPTION,
+                  stateSize = rows == 1 ? T_BODY : T_MICRO;
+            rect(left, top, left + cardWidth, top + cardHeight, FILL);
             Object device = devices.get(i);
             boolean isOn = Json.bool(device, "on"), available = Json.bool(device, "available");
             String deviceId = Json.str(device, "id");
             String pendingMark = deviceId == null ? null : mark(data, "device:" + deviceId);
             // Waiting: the requested state with a grey bar and 正在开启…; unconfirmed: HA's own state, marked.
             if (isOn)
-                rect(left, 2034, left + cardWidth, 2038, "wait".equals(pendingMark) ? G777 : BLACK);
-            text(Json.str(device, "name"), left + 24, 2084.5f, Ink.SANS_BOLD, 28, available ? BLACK : G999);
+                hrule(left, top, left + cardWidth, RULE_BLOCK, "wait".equals(pendingMark) ? INK_3 : INK);
+            // Configured names use Medium's complete CJK font; the heavier faces are subsets.
+            text(fit(Json.str(device, "name"), cardWidth - padding * 2, Ink.SANS_MEDIUM, nameSize), left + padding,
+                top + (rows == 1 ? 50.5f : 21), Ink.SANS_MEDIUM, nameSize, available ? INK : INK_3);
             Double durationMinutes = Json.num(device, "minutes");
             String stateText;
             if (!available) {
@@ -1295,35 +1386,36 @@ public final class Page {
                 stateText = isOn ? "正在开启…" : "正在关闭…";
             else if ("unconfirmed".equals(pendingMark))
                 stateText += " · 未确认";
-            int stateColor = BLACK;
+            int stateColor = INK;
             if (!available) {
-                stateColor = G999;
+                stateColor = INK_3;
             } else if (pendingMark != null) {
-                stateColor = G444;
+                stateColor = INK_2;
             }
-            text(stateText, left + 24, 2119.5f, Ink.INTER_MEDIUM, 22, stateColor);
+            text(fit(stateText, cardWidth - padding * 2, Ink.INTER_MEDIUM, stateSize), left + padding,
+                top + (rows == 1 ? 85.5f : 44), Ink.INTER_MEDIUM, stateSize, stateColor);
             if (available && deviceId != null)
-                target(left, 2034, left + cardWidth, 2144, "device:" + deviceId + (isOn ? ":off" : ":on"));
+                target(left, top, left + cardWidth, top + cardHeight, "device:" + deviceId + (isOn ? ":off" : ":on"));
         }
     }
 
     private void menu(State viewState) {
         // Right-aligned under the status bar: 16 padding, four 168 x 72 buttons, divider before 取消, 3px outline.
         float l = 1578 - 754, t = 128;
-        rect(l - 3, t - 3, 1581, t + 107, BLACK);
-        rect(l, t, 1578, t + 104, WHITE);
+        rect(l - RULE_TITLE, t - RULE_TITLE, 1578 + RULE_TITLE, t + 104 + RULE_TITLE, INK);
+        rect(l, t, 1578, t + 104, PAPER);
         String[] labels = {"刷新", "设置", viewState.exitArm ? "确认退出" : "退出", "取消"};
         String[] actions = {"menu:refresh", "menu:settings", "menu:exit", "menu:cancel"};
         float x = l + 16;
         for (int i = 0; i < 4; i++) {
             if (i == 3) {
-                rect(x, t + 28, x + 2, t + 76, BLACK);
+                vrule(x, t + 28, t + 76, RULE_ROW, INK);
                 x += 14;
             }
             boolean armed = i == 2 && viewState.exitArm;
-            rect(x, t + 16, x + 168, t + 88, armed ? BLACK : GEEE);
-            center(labels[i], x + 84, base(t + 16, 72, Ink.SANS_MEDIUM, 26, labels[i]), Ink.SANS_MEDIUM, 26,
-                armed ? WHITE : BLACK);
+            rect(x, t + 16, x + 168, t + 88, armed ? INK : FILL);
+            center(labels[i], x + 84, base(t + 16, 72, Ink.SANS_MEDIUM, T_TITLE, labels[i]), Ink.SANS_MEDIUM, T_TITLE,
+                armed ? PAPER : INK);
             target(x, t + 16, x + 168, t + 88, actions[i]);
             x += 168 + 12;
         }

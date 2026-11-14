@@ -52,6 +52,8 @@ options:
   assistant_screen_quiet_end: "06:00"
   assistant_context_tokens: 32768
   assistant_memory_ttl_days: 14
+  rooms: []
+  devices: []
   entities:
     climate: "climate.living_room"
     living_temperature: "climate.living_room#current_temperature"
@@ -110,6 +112,16 @@ schema:
   assistant_screen_quiet_end: str
   assistant_context_tokens: "int(16384,131072)"
   assistant_memory_ttl_days: "int(1,365)"
+  rooms:
+    - id: "match(^[a-z][a-z0-9_]{0,31}$)"
+      name: "str(1,32)"
+      temperature: "str?"
+      humidity: "str?"
+  devices:
+    - id: "match(^[a-z][a-z0-9_]{0,31}$)"
+      name: "str(1,32)"
+      entity: str
+      type: "list(toggle|nest_fan)"
   entities:
     climate: str
     living_temperature: str

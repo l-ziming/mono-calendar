@@ -12,6 +12,8 @@ import javax.imageio.ImageIO;
 /**
  * Desktop check: draws the RP1 page with Java2D from fixture data and writes a 16-grey PNG.
  * Usage: java PageRender data.json out.png [epochMillis|-] [battery] [wifi 0|1] [warning]; "-" uses the data time.
+ * State overrides: -DacMode=heat_cool and -Dselected=2026-11-07 (a day whose 忌 list is just 无).
+ * -Dlayout=6,8 checks configured room/device counts, long names and all device hit areas.
  * Fonts are read from the same files bundled into the APK (android/assets/fonts).
  */
 public final class PageRender implements Ink {
@@ -19,6 +21,7 @@ public final class PageRender implements Ink {
     private final Font[] fonts = new Font[FONT_FILES.length];
     private final FontRenderContext fontContext;
     private final StringBuilder warningText = new StringBuilder();
+    private final Set<String> drawnText = new HashSet<>();
     private Shape saved;
 
     PageRender(Graphics2D graphics, Path fontDir) throws Exception {
@@ -33,7 +36,13 @@ public final class PageRender implements Ink {
         graphics.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         fontContext = graphics.getFontRenderContext();
     }
+    /** Only the page's grey roles may be drawn (Page.GREYS); a new grey means a new role, not a new value. */
     private Color grayColor(int gray) {
+        boolean token = false;
+        for (int g : Page.GREYS)
+            token |= g == gray;
+        if (!token)
+            throw new IllegalStateException("Grey outside the design tokens: #" + Integer.toHexString(gray));
         return new Color(gray, gray, gray);
     }
     public void rect(float l, float t, float r, float b, int gray) {
@@ -54,10 +63,16 @@ public final class PageRender implements Ink {
         return (float) font(fontIndex, size).getStringBounds(text, fontContext).getWidth();
     }
     public void text(String text, float x, float y, int fontIndex, float size, int gray) {
+        drawnText.add(text);
         if (y == 107 && size == 18 && gray == 255)
             warningText.append(text);
         if (fontIndex == Ink.SANS || fontIndex == Ink.INTER)
             throw new IllegalStateException("Design's default weight is 500: " + text);
+        boolean scaled = false;
+        for (float step : Page.TYPE_SCALE)
+            scaled |= step == size;
+        if (!scaled)
+            throw new IllegalStateException("Text size outside the type scale (Page.TYPE_SCALE): " + size + " " + text);
         if ("“".equals(text) && fontIndex != Ink.SERIF_LATIN_BOLD)
             throw new IllegalStateException("Decorative quote uses Latin Noto Serif Bold");
         graphics.setColor(grayColor(gray));
@@ -125,9 +140,64 @@ public final class PageRender implements Ink {
         graphics.drawImage(img, Math.round(left), Math.round(top), null);
     }
 
+    private static Page.Target checkTargetEdges(List<Page.Target> targets, String action) {
+        Page.Target wanted = null;
+        for (Page.Target target : targets)
+            if (action.equals(target.action))
+                wanted = target;
+        if (wanted == null)
+            throw new IllegalStateException("Missing target " + action);
+        float cx = (wanted.left + wanted.right) / 2, cy = (wanted.top + wanted.bottom) / 2;
+        float[][] edges = {{wanted.left + 0.5f, cy}, {wanted.right - 0.5f, cy},
+            {cx, wanted.top + 0.5f}, {cx, wanted.bottom - 0.5f}};
+        for (float[] point : edges) {
+            Page.Target hit = null;
+            for (int i = targets.size() - 1; i >= 0; i--)
+                if (targets.get(i).contains(point[0], point[1])) {
+                    hit = targets.get(i);
+                    break;
+                }
+            if (hit != wanted)
+                throw new IllegalStateException("Target edge misses " + action);
+        }
+        return wanted;
+    }
+
+    @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         Path root = Paths.get(System.getProperty("project", "."));
         Object data = Json.parse(new String(Files.readAllBytes(Paths.get(args[0])), "UTF-8"));
+        String acMode = System.getProperty("acMode");
+        if (acMode != null)
+            Json.obj(data, "ac").put("mode", acMode);
+        String layout = System.getProperty("layout");
+        int roomCount = 0, deviceCount = 0;
+        if (layout != null) {
+            String[] counts = layout.split(",");
+            roomCount = Integer.parseInt(counts[0]);
+            deviceCount = Integer.parseInt(counts[1]);
+            List<Object> rooms = new ArrayList<>(), devices = new ArrayList<>();
+            for (int i = 0; i < roomCount; i++) {
+                Map<String, Object> room = new LinkedHashMap<>();
+                room.put("id", "room_" + i);
+                room.put("name", "房间" + i + " 龘字和很长的自定义房间名称不能越过这一格");
+                room.put("temp", i == 0 ? null : 18.5 + i);
+                room.put("humidity", i == 1 ? null : 40.0 + i);
+                rooms.add(room);
+            }
+            for (int i = 0; i < deviceCount; i++) {
+                Map<String, Object> device = new LinkedHashMap<>();
+                device.put("id", "device_" + i);
+                device.put("name", "设备" + i + " 龘字和很长的自定义设备名称不能越过这一格");
+                device.put("on", i % 2 == 0);
+                device.put("available", true);
+                if (i == deviceCount - 1)
+                    device.put("minutes", 15.0);
+                devices.add(device);
+            }
+            ((Map<String, Object>) data).put("rooms", rooms);
+            ((Map<String, Object>) data).put("devices", devices);
+        }
         long now = args.length > 2 && !"-".equals(args[2]) ? Long.parseLong(args[2])
                                                            : ((Double) ((Map<?, ?>) data).get("dataTime")).longValue();
         Almanac almanac = new Almanac(new FileInputStream(root.resolve("android/assets/almanac.bin").toFile()),
@@ -142,6 +212,13 @@ public final class PageRender implements Ink {
         status.wifi = args.length <= 4 || !"0".equals(args[4]);
         status.warning = args.length > 5 ? args[5] : "截至 15:00 已 30 分钟未更新，请充电";
         Page.State state = new Page.State();
+        String selectedDate = System.getProperty("selected");
+        if (selectedDate != null) {
+            String[] date = selectedDate.split("-");
+            state.viewYear = Integer.parseInt(date[0]);
+            state.viewMonth = Integer.parseInt(date[1]);
+            state.selected = Almanac.epochDay(state.viewYear, state.viewMonth, Integer.parseInt(date[2]));
+        }
         if (System.getProperty("menu") != null) {
             state.menu = true;
             state.exitArm = "armed".equals(System.getProperty("menu"));
@@ -183,6 +260,46 @@ public final class PageRender implements Ink {
                 throw new IllegalStateException("Small target " + target.action);
             if (target.left < 0 || target.top < 0 || target.right > Page.W + 8 || target.bottom > Page.H)
                 throw new IllegalStateException("Target outside page " + target.action);
+        }
+        if ("heat_cool".equals(acMode)) {
+            List<Page.Target> range = new ArrayList<>();
+            for (String action : new String[] {"range_low_down", "range_low_up", "range_high_down", "range_high_up"})
+                range.add(checkTargetEdges(targets, action));
+            for (int i = 0; i < range.size(); i++)
+                for (int j = i + 1; j < range.size(); j++) {
+                    Page.Target a = range.get(i), b = range.get(j);
+                    if (Math.max(a.left, b.left) < Math.min(a.right, b.right)
+                        && Math.max(a.top, b.top) < Math.min(a.bottom, b.bottom))
+                        throw new IllegalStateException("Range targets overlap: " + a.action + " and " + b.action);
+                }
+        }
+        if ("2026-11-07".equals(selectedDate))
+            checkTargetEdges(targets, "card:忌:无");
+        if (layout != null) {
+            if (roomCount == 0 && (ink.drawnText.contains("客厅") || ink.drawnText.contains("卧室")))
+                throw new IllegalStateException("Empty room list must not fall back to legacy rooms");
+            for (int i = 0; i < roomCount; i++) {
+                final String prefix = "房间" + i;
+                if (ink.drawnText.stream().noneMatch(text -> text.startsWith(prefix)))
+                    throw new IllegalStateException("Configured room not drawn " + i);
+            }
+            List<Page.Target> deviceTargets = new ArrayList<>();
+            for (int i = 0; i < deviceCount; i++) {
+                final String prefix = "设备" + i;
+                if (ink.drawnText.stream().noneMatch(text -> text.startsWith(prefix)))
+                    throw new IllegalStateException("Configured device not drawn " + i);
+                Page.Target target = checkTargetEdges(targets, "device:device_" + i + (i % 2 == 0 ? ":off" : ":on"));
+                if (target.left < 72 || target.top < 2034 || target.right > 1578 || target.bottom > 2144)
+                    throw new IllegalStateException("Configured device outside its region " + i);
+                deviceTargets.add(target);
+            }
+            for (Page.Target a : deviceTargets)
+                for (Page.Target b : deviceTargets)
+                    if (a != b && Math.max(a.left, b.left) < Math.min(a.right, b.right)
+                        && Math.max(a.top, b.top) < Math.min(a.bottom, b.bottom))
+                        throw new IllegalStateException("Configured device targets overlap");
+            if (deviceCount == 0 && targets.stream().anyMatch(target -> target.action.startsWith("device:")))
+                throw new IllegalStateException("Empty device list must have no control targets");
         }
         graphics.dispose();
         BufferedImage grey = new BufferedImage(Page.W, Page.H, BufferedImage.TYPE_BYTE_GRAY);

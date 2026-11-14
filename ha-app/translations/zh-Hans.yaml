@@ -26,6 +26,30 @@ configuration:
   calendars:
     name: 日历实体
     description: 可选，HA 日历实体 ID，例如 calendar.home。也可以在网页「助手设置」中修改。
+  rooms:
+    name: 房间
+    description: 最多 6 个房间，按填写顺序显示名称和温湿度。空列表沿用实体映射里的客厅、卧室。保存并重启后生效。
+    fields:
+      id:
+        name: 房间 ID
+      name:
+        name: 显示名称
+      temperature:
+        name: 温度实体或属性
+      humidity:
+        name: 湿度实体或属性
+  devices:
+    name: 设备
+    description: 最多 8 个设备，按填写顺序显示。toggle 支持 light、switch、fan；nest_fan 使用 climate 的 Nest 15 分钟定时风扇。空列表沿用原有两个灯和风扇。保存并重启后生效。
+    fields:
+      id:
+        name: 设备 ID
+      name:
+        name: 显示名称
+      entity:
+        name: HA 实体
+      type:
+        name: 控制类型
   entities:
     name: 实体映射
     description: 屏幕各区域对应的 HA 实体。传感器支持 entity_id#attribute 读取属性；未使用的留空。

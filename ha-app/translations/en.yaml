@@ -26,6 +26,30 @@ configuration:
   calendars:
     name: Calendar entities
     description: Optional HA calendar entity IDs such as calendar.home. Also editable in the web assistant settings.
+  rooms:
+    name: Rooms
+    description: Up to 6 rooms, shown in list order with their temperature and humidity. An empty list keeps the legacy living and bedroom mappings. Restart after saving.
+    fields:
+      id:
+        name: Room ID
+      name:
+        name: Display name
+      temperature:
+        name: Temperature entity or attribute
+      humidity:
+        name: Humidity entity or attribute
+  devices:
+    name: Devices
+    description: Up to 8 devices in list order. toggle supports light, switch and fan; nest_fan uses a climate entity and the Nest 15-minute fan timer. An empty list keeps the two legacy lights and fan. Restart after saving.
+    fields:
+      id:
+        name: Device ID
+      name:
+        name: Display name
+      entity:
+        name: HA entity
+      type:
+        name: Control type
   entities:
     name: Entity mapping
     description: HA entities for each area of the display. Sensors accept entity_id#attribute; leave unused ones blank.

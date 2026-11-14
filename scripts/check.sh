@@ -27,5 +27,10 @@ if [[ -n "${JAVA_HOME:-}" && -x "$jdk/javac" ]]; then
   "$jdk/java" -Djava.awt.headless=true -Dproject=. -cp "$classes" PageRender output/fixture-data.json output/fixture-data.png - 80 1 ""
   "$jdk/java" -Djava.awt.headless=true -Dproject=. -Dcard=宜:嫁娶 -Dicon=android/res/mipmap-xxxhdpi/ic_launcher.png -cp "$classes" PageRender tests/fixtures/sample-data.json docs/images/sample-card.png
   "$jdk/java" -Djava.awt.headless=true -Dproject=. -Dcard=节:立冬 -cp "$classes" PageRender tests/fixtures/sample-data.json docs/images/sample-term.png
-  echo "Rendered docs/images/sample.png, sample-menu.png, sample-card.png, sample-term.png and fixture-data.png"
+  "$jdk/java" -Djava.awt.headless=true -Dproject=. -DacMode=heat_cool -cp "$classes" PageRender tests/fixtures/sample-data.json output/sample-range.png
+  "$jdk/java" -Djava.awt.headless=true -Dproject=. -Dselected=2026-11-07 -cp "$classes" PageRender tests/fixtures/sample-data.json output/sample-single-word.png
+  for layout in 0,0 1,1 2,3 3,4 4,5 6,8; do
+    "$jdk/java" -Djava.awt.headless=true -Dproject=. -Dlayout="$layout" -cp "$classes" PageRender tests/fixtures/sample-data.json "output/sample-layout-${layout/,/-}.png"
+  done
+  echo "Rendered docs/images/sample*.png and output/fixture-data.png, sample-range.png, sample-single-word.png, sample-layout-*.png"
 fi

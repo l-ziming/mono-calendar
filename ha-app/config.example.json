@@ -25,6 +25,8 @@
   "assistant_context_tokens": 32768,
   "assistant_memory_ttl_days": 14,
   "calendars": [],
+  "rooms": [],
+  "devices": [],
   "entities": {
     "climate": "climate.living_room",
     "living_temperature": "climate.living_room#current_temperature",

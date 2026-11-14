@@ -35,7 +35,8 @@ public final class Optimistic {
                 if (deviceValue instanceof Map && id.equals(Json.str(deviceValue, "id"))) {
                     Map<String, Object> device = (Map<String, Object>) deviceValue;
                     device.put("on", on);
-                    if ("fan".equals(id)) {
+                    String type = Json.str(device, "type");
+                    if ("nest_fan".equals(type) || type == null && "fan".equals(id)) {
                         if (on)
                             device.put("minutes", 15.0);
                         else

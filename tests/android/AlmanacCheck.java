@@ -43,6 +43,17 @@ public class AlmanacCheck {
         Optimistic.apply(data, "device:fan:on");
         Object fan = Json.list(data, "devices").get(0);
         assert Json.bool(fan, "on") && Json.num(fan, "minutes") == 15;
+        Object configuredDevices = Json.parse("{\"devices\":[{\"id\":\"ventilation\",\"type\":\"nest_fan\",\"on\":false},"
+            + "{\"id\":\"fan\",\"type\":\"toggle\",\"on\":false}]}");
+        Optimistic.apply(configuredDevices, "device:ventilation:on");
+        assert Json.num(Json.list(configuredDevices, "devices").get(0), "minutes") == 15
+            : "a configured Nest fan keeps its timer under a custom id";
+        Optimistic.apply(configuredDevices, "device:ventilation:off");
+        assert Json.num(Json.list(configuredDevices, "devices").get(0), "minutes") == null;
+        Optimistic.apply(configuredDevices, "device:fan:on");
+        assert Json.bool(Json.list(configuredDevices, "devices").get(1), "on")
+            && Json.num(Json.list(configuredDevices, "devices").get(1), "minutes") == null
+            : "a plain fan toggle is not assigned a Nest timer by its id";
         Optimistic.apply(data, "device:desk_light:off");
         assert !Json.bool(Json.list(data, "devices").get(1), "on");
         Optimistic.apply(data, "device:desk_light:off");

@@ -28,6 +28,7 @@ assert.deepEqual(Object.keys(data).sort(), [
   'indoor',
   'online',
   'requests',
+  'rooms',
   'schedule',
   'server',
   'timezone',
