@@ -4,13 +4,13 @@ Copyright (c) 2026 l-ziming
 
 ## 范围 / Scope
 
-以下内容按 [知识共享 署名-非商业性使用 4.0 国际许可（CC BY-NC 4.0）](https://creativecommons.org/licenses/by-nc/4.0/) 授权，不适用于代码所用的 `LICENSE`：
+以下内容按 [知识共享 署名-非商业性使用 4.0 国际许可（CC BY-NC 4.0）](https://creativecommons.org/licenses/by-nc/4.0/) 授权，不适用于代码所用的 [`LICENSE`](../LICENSE)：
 
 - 刻历页面的视觉设计：版式、排版、信息层级与图形风格，包括由 `android/src/dev/monocalendar/rp1/Page.java` 绘制出的界面外观；
 - Logo 与应用图标：`design/icon/logo.svg` 及由它生成的 `android/res/`、`ha-app/icon.png`；
 - 样例图：`docs/images/sample*.png`。
 
-The visual design of the 刻历 page (layout, typography, information hierarchy and graphic style, including the appearance rendered by `Page.java`), the logo and app icons (`design/icon/logo.svg` and the icons generated from it in `android/res/` and `ha-app/icon.png`) and the sample images (`docs/images/sample*.png`) are licensed under CC BY-NC 4.0. The code is licensed separately under `LICENSE`.
+The visual design of the 刻历 page (layout, typography, information hierarchy and graphic style, including the appearance rendered by `Page.java`), the logo and app icons (`design/icon/logo.svg` and the icons generated from it in `android/res/` and `ha-app/icon.png`) and the sample images (`docs/images/sample*.png`) are licensed under CC BY-NC 4.0. The code is licensed separately under [`LICENSE`](../LICENSE).
 
 ## 署名方式 / Requested attribution
 

@@ -4,7 +4,7 @@
 
 [![检查](https://img.shields.io/github/actions/workflow/status/l-ziming/mono-calendar/check.yml?branch=main&event=push&style=flat&label=checks&logo=githubactions&logoColor=white)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
 [![主体代码：PolyForm Noncommercial](https://img.shields.io/badge/app_code-PolyForm_Noncommercial-9A6700?style=flat)](LICENSE)
-[![设计：CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](LICENSE-DESIGN.md)
+[![设计：CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](design/LICENSE.md)
 [![Home Assistant App](https://img.shields.io/badge/Home_Assistant-App-18BCF2?style=flat&logo=homeassistant&logoColor=white)](ha-app/DOCS.md)
 [![Sony DPT-RP1](https://img.shields.io/badge/Sony-DPT--RP1-24292F?style=flat)](docs/hardware.md)
 
@@ -80,6 +80,6 @@ GitHub Actions 会在提交和 PR 时自动运行测试；在 Actions 页手动�
 
 - **项目主体原创代码**：Android、HA 应用及原创工具等采用 [PolyForm Noncommercial 1.0.0](LICENSE)。个人、学习、研究和非营利用途可以自由使用、修改和分发，需保留 [NOTICE](NOTICE) 中的 `Required Notice`。
 - **RP1 Wi-Fi 驱动及其修改**：`misc/rp1-wifi/` 中的 Marvell 驱动源码、原版与修复后的模块及驱动补丁沿用 [GPLv2](misc/rp1-wifi/GPL-2.0.txt)，保留原有版权声明。修复版的[源码和构建资料](misc/rp1-wifi/README.md)一同提供。这部分不受主体的非商业限制和 `NOTICE` 要求约束，使用、修改和分发遵循 GPLv2。
-- **视觉设计、图标与样例图**：[CC BY-NC 4.0](LICENSE-DESIGN.md)。使用或改编本设计的作品须在界面上署名「设计基于 刻历 by l-ziming」。
+- **视觉设计、图标与样例图**：[CC BY-NC 4.0](design/LICENSE.md)。使用或改编本设计的作品须在界面上署名「设计基于 刻历 by l-ziming」。
 - **主体代码和设计的商业使用**：将上述主体原创代码或视觉设计用于设备预装销售、随设备销售附赠或捆绑、营利性代装、定制或托管等商业用途前，需通过本仓库的 GitHub Issues 联系作者，取得单独书面授权。软件不单独收费，不等于用途属于非商业；具体授权范围以各许可证为准。
 - **其他第三方组件**保留各自许可，不受主体的非商业限制和 `NOTICE` 要求约束，见[致谢](#致谢)。

@@ -4,7 +4,7 @@
 
 [![Checks](https://img.shields.io/github/actions/workflow/status/l-ziming/mono-calendar/check.yml?branch=main&event=push&style=flat&label=checks&logo=githubactions&logoColor=white)](https://github.com/l-ziming/mono-calendar/actions/workflows/check.yml)
 [![App code: PolyForm Noncommercial](https://img.shields.io/badge/app_code-PolyForm_Noncommercial-9A6700?style=flat)](LICENSE)
-[![Design: CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](LICENSE-DESIGN.md)
+[![Design: CC BY-NC 4.0](https://img.shields.io/badge/design-CC_BY--NC_4.0-6E7781?style=flat&logo=creativecommons&logoColor=white)](design/LICENSE.md)
 [![Home Assistant App](https://img.shields.io/badge/Home_Assistant-App-18BCF2?style=flat&logo=homeassistant&logoColor=white)](ha-app/DOCS.md)
 [![Sony DPT-RP1](https://img.shields.io/badge/Sony-DPT--RP1-24292F?style=flat)](docs/hardware.md)
 
@@ -81,6 +81,6 @@ I publish the application source I wrote so people tinkering with the RP1 or oth
 
 - **Original project code**: The project's original code, including the Android and HA applications and tools, uses [PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for personal, learning, research and non-profit purposes, keeping the `Required Notice` lines in [NOTICE](NOTICE).
 - **RP1 Wi-Fi driver and its modifications**: The Marvell driver source, stock and patched modules, and driver patch in `misc/rp1-wifi/` retain [GPLv2](misc/rp1-wifi/GPL-2.0.txt) and the original copyright notices. The patched modules' [source and build materials](misc/rp1-wifi/README.md) are included. The project's noncommercial restrictions and `NOTICE` requirements do not apply to this driver; its use, modification and distribution follow GPLv2.
-- **Visual design, icons and sample images**: [CC BY-NC 4.0](LICENSE-DESIGN.md). Works that use or adapt the design must show "Design based on 刻历 by l-ziming" in their interface.
+- **Visual design, icons and sample images**: [CC BY-NC 4.0](design/LICENSE.md). Works that use or adapt the design must show "Design based on 刻历 by l-ziming" in their interface.
 - **Commercial use of the original code and design**: Contact the author through this repository's GitHub Issues for separate written permission before using the original project code or visual design commercially, such as selling devices with them preinstalled, bundling them as a "free" addition to a device sale, or offering installation, customization or hosting as a for-profit service. Not charging separately for the software does not make the use noncommercial; the applicable license texts govern.
 - **Other third-party components** keep their own licenses and are not subject to the project's noncommercial restrictions or `NOTICE` requirements; see [Acknowledgments](#acknowledgments).
