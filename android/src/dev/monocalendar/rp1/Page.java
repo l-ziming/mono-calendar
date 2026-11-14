@@ -765,9 +765,12 @@ public final class Page {
                 text(String.valueOf(day.day), l + 12, top + border + 45.5f, Ink.SERIF, T_H3, foreground);
                 if (day.known) {
                     if (day.strong && !outsideMonth) {
+                        float tx = l + 12, baseline = top + 80, padding = 5;
                         float tw = width(day.label, Ink.SANS_SEMIBOLD, T_CAPTION);
-                        rect(l + 8, top + 59, l + 16 + tw, top + 85, selected ? PAPER : TINT);
-                        text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, T_CAPTION, INK);
+                        // The 18px CJK box spans baseline - 16 to baseline + 2.
+                        rect(tx - padding, baseline - 16 - padding, tx + tw + padding, baseline + 2 + padding,
+                            selected ? PAPER : TINT);
+                        text(day.label, tx, baseline, Ink.SANS_SEMIBOLD, T_CAPTION, INK);
                     } else
                         text(day.label, l + 12, top + 80, Ink.SANS_SEMIBOLD, T_CAPTION, foreground);
                 }
