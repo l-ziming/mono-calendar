@@ -1,5 +1,5 @@
 name: "刻历"
-version: "0.10.4"
+version: "0.10.5"
 slug: "mono_calendar"
 description: "Data, device controls and an LLM assistant for e-ink calendar"
 url: "https://github.com/l-ziming/mono-calendar"
