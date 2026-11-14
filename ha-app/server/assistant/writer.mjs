@@ -376,7 +376,7 @@ export class AssistantWriter {
     return { lines: readLines(state.state), at: state.last_changed || state.last_updated || null };
   }
   /** Validate and commit only this screen action. No other action is rolled back on rejection. */
-  async publish(action, { now = new Date(), signal } = {}) {
+  async publish(action, { now = new Date(), signal, trigger = 'scheduled' } = {}) {
     if (!this.enabled) return rejected('screen_disabled');
     if (this.stateError) return rejected('schedule_state_unavailable');
     const allowed = ['action', 'lines', 'expires_at', 'base_version', 'news_ids', 'reason'];
@@ -433,7 +433,7 @@ export class AssistantWriter {
       if (operation === 'clear' && !current.lines.length) return { status: 'kept', reason: 'empty' };
       if (operation === 'update' && sameLines(lines, current.lines) && !expired)
         return { status: 'kept', reason: 'unchanged' };
-      if (this.quiet(at)) return rejected('quiet_hours');
+      if (trigger !== 'manual' && this.quiet(at)) return rejected('quiet_hours');
       const changed = timestamp(current.at);
       const last = Math.max(Number.isFinite(changed) ? changed : 0, this.state.writes.at(-1) || 0);
       if (last && at - last < this.settings.assistant_screen_min_minutes * 60000) return rejected('minimum_stay');

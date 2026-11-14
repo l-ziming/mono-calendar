@@ -443,7 +443,8 @@ try {
       'Keeping or clearing an empty screen does not claim to retain an existing note',
     );
   assert.equal(empty.writes.length, 0, 'An empty no-op does not write or consume the update allowance');
-  assert.equal((await empty.writer.publish(empty.action(), { now })).reason, 'minimum_stay');
+  for (const trigger of ['scheduled', 'manual'])
+    assert.equal((await empty.writer.publish(empty.action(), { now, trigger })).reason, 'minimum_stay');
   const unconfiguredAge = harness({ assistant_screen_min_minutes: 0 });
   unconfiguredAge.current = { state: '', last_changed: now.toISOString() };
   assert.equal((await unconfiguredAge.writer.publish(unconfiguredAge.action(), { now })).status, 'updated');
@@ -468,7 +469,8 @@ try {
   );
   const limit = harness({ assistant_screen_max_per_hour: 1, assistant_screen_min_minutes: 0 });
   limit.writer.state.writes = [now.getTime() - 10000];
-  assert.equal((await limit.writer.publish(limit.action(), { now })).reason, 'hourly_limit');
+  for (const trigger of ['scheduled', 'manual'])
+    assert.equal((await limit.writer.publish(limit.action(), { now, trigger })).reason, 'hourly_limit');
   const expired = harness();
   expired.writer.state.previous = { lines: expired.snapshot().lines, expires_at: now.toISOString() };
   assert.equal(
@@ -484,6 +486,7 @@ try {
     { expires_at: null },
     { expires_at: '2026-11-10T00:00:00Z' },
     { bad_key: true },
+    { trigger: 'manual' },
     { action: 'launch' },
   ])
     assert.equal((await bad.writer.publish(bad.action(extra), { now })).status, 'rejected');

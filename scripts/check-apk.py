@@ -6,7 +6,7 @@ apk_path, badging_path = map(pathlib.Path, sys.argv[1:])
 text = badging_path.read_text()
 assert "sdkVersion:'22'" in text and "targetSdkVersion:'22'" in text
 assert "package: name='dev.monocalendar.rp1'" in text
-assert "versionCode='18'" in text and "versionName='0.7.8'" in text
+assert "versionCode='19'" in text and "versionName='0.7.9'" in text
 assert 'CHANGE_WIFI_STATE' not in text, 'The App must not control Wi-Fi'
 with zipfile.ZipFile(apk_path) as archive:
     members = set(archive.namelist())
@@ -43,4 +43,4 @@ with zipfile.ZipFile(apk_path) as archive:
         table_tags = {font_data[12 + 16 * index : 16 + 16 * index] for index in range(table_count)}
         assert b'cmap' in table_tags and b'name' in table_tags and b'fvar' not in table_tags
         assert archive.read('assets/fonts/' + license_name).strip(), 'Font license required'
-print('APK 0.7.8, API 22, ARMv7, JNI, almanac, eleven bundled fonts/licenses, no Wi-Fi control checked')
+print('APK 0.7.9, API 22, ARMv7, JNI, almanac, eleven bundled fonts/licenses, no Wi-Fi control checked')

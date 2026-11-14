@@ -400,6 +400,34 @@ function harness(entities = {}, display = {}) {
     await done.catch(() => {});
     assert.equal(request.status, status);
   }
+  // Detailed screen checks keep their feedback all the way through POST /action and GET /data.
+  for (const [id, result, status, message] of [
+    [
+      'assistant-kept',
+      { ok: true, status: 'kept', message: '已检查，保留原便条。' },
+      'confirmed',
+      '已检查，保留原便条。',
+    ],
+    ['assistant-updated', { ok: true, status: 'updated', message: '便条已更新。' }, 'confirmed', '便条已更新。'],
+    [
+      'assistant-rejected',
+      { ok: false, status: 'rejected', error: '当前为屏幕静默时段。' },
+      'failed',
+      '当前为屏幕静默时段。',
+    ],
+    ['assistant-thrown', new Error('正在保存助手设置，请稍后再试。'), 'failed', '正在保存助手设置，请稍后再试。'],
+  ]) {
+    h.app.setRewrite(async () => {
+      if (result instanceof Error) throw result;
+      return result;
+    });
+    const accepted = await h.request('POST', '/action', { action: 'assistant', id });
+    assert.equal(accepted.code, 202);
+    await h.app.submit('assistant', id).done.catch(() => {});
+    const entry = (await h.request('GET', '/data')).body.requests.find((item) => item.id === id);
+    assert.equal(entry.status, status);
+    assert.equal(status === 'confirmed' ? entry.message : entry.error, message);
+  }
 }
 console.log(
   'Calendar ranges/DST, per-day items with end/until, note privacy, image client, /data ETag, hint lines and /image, rejected to-do actions checked.',

@@ -82,6 +82,27 @@ public class RequestsCheck {
         notices = requests.reconcile(confirmedData, startedAt + Requests.GIVE_UP_MS + 1);
         assert !requests.any() && notices.size() == 1 : "nothing waits forever";
 
+        // Screen inference may take longer than device writes; keep waiting through the server's 390 s budget.
+        requests.start("assistant", "screen-1", startedAt);
+        requests.accepted("screen-1", 10, "s1", "pending");
+        Object screenPending = doc("", "{\"id\":\"screen-1\",\"status\":\"pending\"}", 10, "s1");
+        notices = requests.reconcile(screenPending, startedAt + 180000);
+        assert requests.get("assistant") != null && notices.isEmpty() : "slow screen checks must remain pending";
+        notices = requests.reconcile(screenPending, startedAt + 390000);
+        assert requests.get("assistant") != null && notices.isEmpty() : "allow time to read the final result";
+        notices = requests.reconcile(doc("", "{\"id\":\"screen-1\",\"status\":\"confirmed\","
+                + "\"message\":\"已检查，保留原便条。\"}", 10, "s1"), startedAt + 391000);
+        assert !requests.any() && notices.equals(Collections.singletonList("已检查，保留原便条。"))
+            : "an unchanged screen still needs visible completion feedback";
+        assert requests.reconcile(confirmedData, startedAt + 392000).isEmpty() : "show completion only once";
+        requests.start("assistant", "screen-2", startedAt);
+        notices = requests.reconcile(confirmedData, startedAt + 401000);
+        assert !requests.any() && notices.size() == 1 : "screen checks still have a bounded wait";
+        requests.start("assistant", "screen-3", startedAt);
+        notices = requests.reconcile(doc("", "{\"id\":\"screen-3\",\"status\":\"failed\","
+                + "\"error\":\"当前为屏幕静默时段，便条未修改。\"}", 11, "s1"), startedAt + 2000);
+        assert !requests.any() && notices.equals(Collections.singletonList("当前为屏幕静默时段，便条未修改。"));
+
         // Climate: absolute targets accumulate from the shown value; a pending mode change blocks temperature taps.
         Object shownClimate = requests.overlay(confirmedData);
         if (shownClimate == confirmedData)

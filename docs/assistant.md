@@ -14,7 +14,7 @@
 | `assistant_screen_times` | 06:30、11:30、16:30、21:00；最多 24 个 `HH:MM`，按配置时区执行；留空关闭 |
 | `assistant_screen_min_minutes` | 15；两次实际修改的最小间隔，可设 0–1440 分钟 |
 | `assistant_screen_max_per_hour` | 4；滚动一小时内的修改次数上限，可设 1–60 次；保持原内容不计数 |
-| `assistant_screen_quiet_start` / `assistant_screen_quiet_end` | 23:00 / 06:00；可跨午夜，起止时间相同则关闭静默 |
+| `assistant_screen_quiet_start` / `assistant_screen_quiet_end` | 23:00 / 06:00；只限制定时更新，手动检查可更新；可跨午夜，起止时间相同则关闭静默 |
 | `assistant_news_mode` | `morning_and_major`；也可选 `off`、`morning`，只影响屏幕内容 |
 | `assistant_news_interval_hours` | 6；重大新闻的最小间隔，可设 1–168 小时 |
 | `assistant_context_tokens` | 32768；可设 16384–131072 |

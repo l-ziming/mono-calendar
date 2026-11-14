@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
+import { Server } from 'node:http';
 import { AssistantMemory } from '../../../ha-app/server/assistant/memory.mjs';
 import { Assistant, streamReply } from '../../../ha-app/server/assistant/index.mjs';
 import { assistantAgenda } from '../../../ha-app/server/sources/agenda.mjs';
-import { createApp } from '../../../ha-app/server/app.mjs';
+import { createApp, start } from '../../../ha-app/server/app.mjs';
 
 const directory = await mkdtemp(join(tmpdir(), 'mono-calendar-assistant-check-'));
 const now = new Date('2026-11-08T17:00:00Z');
@@ -1107,6 +1108,100 @@ try {
   );
   assert.equal(blockedScreen.writes.length, 0);
 
+  // The actual trigger reaches the writer: scheduled changes stay quiet; manual updates and clears may write.
+  const quietNow = new Date('2026-11-10T10:00:00Z'); // 03:00 in Denver
+  for (const action of ['update', 'clear']) {
+    let current = { state: '原有便条。', last_changed: new Date(+quietNow - 3600000).toISOString() };
+    const writes = [];
+    const quietScreen = harness({
+      config: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
+      ha: {
+        states: async (ids) => Object.fromEntries(ids.map((id) => [id, { ...current }])),
+        service: async (domain, name, payload) => {
+          writes.push(payload.value);
+          current = { state: payload.value, last_changed: quietNow.toISOString() };
+        },
+      },
+      context: async () => ({
+        ...structuredClone(context),
+        previous: { lines: current.state.split('\n'), at: current.last_changed },
+      }),
+      respond: (body) => {
+        const snapshot = requestSnapshot(body);
+        return toolStream([
+          {
+            name: 'screen',
+            arguments: {
+              action,
+              lines: action === 'update' ? ['新的便条。'] : [],
+              expires_at: action === 'update' ? snapshot.screen.suggested_expires_at : null,
+              base_version: snapshot.screen.version,
+            },
+          },
+        ]);
+      },
+    });
+    await quietScreen.assistant.load();
+    assert.deepEqual(await quietScreen.assistant.decide('scheduled', quietNow, { details: true }), {
+      ok: false,
+      status: 'rejected',
+      reason: 'quiet_hours',
+    });
+    assert.equal(writes.length, 0);
+    assert.deepEqual(await quietScreen.assistant.decide('manual', quietNow, { details: true }), {
+      ok: true,
+      status: action === 'update' ? 'updated' : 'cleared',
+    });
+    assert.deepEqual(writes, [action === 'update' ? '新的便条。' : '']);
+  }
+
+  let quietScheduledSignal;
+  let quietScheduledEntered;
+  const quietScheduledStarted = new Promise((resolve) => {
+    quietScheduledEntered = resolve;
+  });
+  const manualWrites = screenWrites.length;
+  const quietPriority = harness({
+    config: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
+    ha: emptyHa,
+    context: emptyContext,
+    respond: (body, assistant, request) => {
+      const snapshot = requestSnapshot(body);
+      if (snapshot.decision.trigger === 'scheduled') {
+        quietScheduledSignal = request.signal;
+        quietScheduledEntered();
+        return new Promise((resolve, reject) => {
+          if (request.signal.aborted) reject(request.signal.reason);
+          else request.signal.addEventListener('abort', () => reject(request.signal.reason), { once: true });
+        });
+      }
+      assert.equal(snapshot.decision.trigger, 'manual');
+      return toolStream([
+        {
+          name: 'screen',
+          arguments: {
+            action: 'update',
+            lines: ['手动检查生成的新便条。'],
+            expires_at: snapshot.screen.suggested_expires_at,
+            base_version: snapshot.screen.version,
+          },
+        },
+      ]);
+    },
+  });
+  await quietPriority.assistant.load();
+  const interruptedQuietCheck = quietPriority.assistant.decide('scheduled', quietNow, { details: true });
+  await quietScheduledStarted;
+  assert.deepEqual(await quietPriority.assistant.decide('manual', quietNow, { details: true }), {
+    ok: true,
+    status: 'updated',
+  });
+  assert.equal((await interruptedQuietCheck).status, 'cancelled');
+  assert.equal(quietScheduledSignal.aborted, true, 'A manual check preempts a scheduled check without sharing its rules');
+  assert.equal(quietPriority.calls.length, 2);
+  assert.equal(screenWrites.length, manualWrites + 1, 'Only the new manual decision may write');
+  assert.equal(emptyScreen.state, '手动检查生成的新便条。');
+
   let enteredBackground;
   let backgroundSignal;
   const backgroundEntered = new Promise((resolve) => {
@@ -1146,7 +1241,7 @@ try {
   );
   const origin = 'http://display.test';
   const headers = { origin, host: 'display.test', 'content-type': 'application/json' };
-  async function request(method, url, data, extraHeaders = {}) {
+  async function request(method, url, data, extraHeaders = {}, target = app) {
     const req = Readable.from(data === undefined ? [] : [Buffer.from(JSON.stringify(data))]);
     Object.assign(req, { method, url, headers: { ...headers, ...extraHeaders } });
     const res = new EventEmitter();
@@ -1172,7 +1267,7 @@ try {
         });
       };
     });
-    app.server.emit('request', req, res);
+    target.server.emit('request', req, res);
     return response;
   }
   assert.equal((await request('GET', '/')).code, 200, 'The public shell contains no private data');
@@ -1292,6 +1387,79 @@ try {
   assert.ok(reads.at(-1).includes('binary_sensor.home'));
   assert.ok(reads.at(-1).includes('sensor.extra'));
   assert.equal(afterSources.presence[0].state, 'on', 'New sources are read on the next request without restarting');
+
+  // Exercise real startup wiring, then enable the screen through the same settings API as the web page.
+  const startupConfig = join(directory, 'startup-config.json');
+  await writeFile(
+    startupConfig,
+    JSON.stringify({
+      ...base,
+      assistant_state_file: join(directory, 'startup-state.json'),
+      assistant_memory_dir: join(directory, 'startup-memory'),
+      entities: { ...base.entities, assistant_text: '' },
+    }),
+  );
+  const originalFetch = globalThis.fetch;
+  const originalListen = Server.prototype.listen;
+  let startedApp;
+  let modelCalls = 0;
+  try {
+    // HTTP requests still pass through the server handler; the test needs no listening socket.
+    Server.prototype.listen = function () {
+      return this;
+    };
+    globalThis.fetch = async (url, options) => {
+      if (String(url).startsWith('https://api.deepseek.com/')) {
+        modelCalls++;
+        const snapshot = requestSnapshot(JSON.parse(options.body));
+        assert.equal(snapshot.decision.trigger, 'manual');
+        return toolStream([
+          {
+            name: 'screen',
+            arguments: { action: 'keep', lines: [], expires_at: null, base_version: snapshot.screen.version },
+          },
+        ]);
+      }
+      if (String(url).includes('/api/states/')) {
+        return Response.json({ state: '测试便条。', last_changed: '2026-11-01T00:00:00Z', attributes: {} });
+      }
+      if (String(url).endsWith('/api/config')) return Response.json({ location_name: '测试地点' });
+      return new Response('', { status: 503 }); // No external news requests in this check.
+    };
+    startedApp = await start(startupConfig, { HA_TOKEN: 'fake-ha-token', DISPLAY_TOKEN: token });
+    const displayHeaders = { origin: undefined, authorization: 'Bearer ' + token };
+    const disabled = await request(
+      'POST', '/action', { action: 'assistant', id: 'startup-disabled' }, displayHeaders, startedApp,
+    );
+    assert.equal(disabled.code, 202);
+    await assert.rejects(startedApp.submit('assistant', 'startup-disabled').done, /尚未配置/);
+    const before = (await request('GET', '/assistant/state', undefined, {}, startedApp)).json();
+    assert.equal(before.settings.api_key_configured, false);
+    const saved = await request(
+      'PUT',
+      '/assistant/settings',
+      {
+        revision: before.settings.revision,
+        options: { llm_api_key: 'fake-startup-key', assistant_text_entity: 'input_text.startup_note' },
+      },
+      {},
+      startedApp,
+    );
+    assert.equal(saved.code, 200);
+    const enabled = await request(
+      'POST', '/action', { action: 'assistant', id: 'startup-enabled' }, displayHeaders, startedApp,
+    );
+    assert.equal(enabled.code, 202);
+    const outcome = await startedApp.submit('assistant', 'startup-enabled').done;
+    assert.equal(modelCalls, 1, 'Enabling after startup must reach the model without restarting');
+    const completed = outcome.requests.find((item) => item.id === 'startup-enabled');
+    assert.equal(completed.status, 'confirmed');
+    assert.equal(completed.message, '已检查，保留原便条。');
+  } finally {
+    startedApp?.server.emit('close');
+    Server.prototype.listen = originalListen;
+    globalThis.fetch = originalFetch;
+  }
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

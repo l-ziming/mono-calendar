@@ -14,6 +14,8 @@ import java.util.*;
  */
 public final class Requests {
     public static final long FAST_MS = 1000, RECHECK_MS = 5000, BUDGET_MS = 10000, GIVE_UP_MS = 130000;
+    // The server allows screen checks 390 s; leave another 10 s to read the result.
+    private static final long SCREEN_GIVE_UP_MS = 400000;
     public static final String SENDING = "sending", PENDING = "pending", UNCONFIRMED = "unconfirmed";
 
     public static final class Request {
@@ -87,7 +89,7 @@ public final class Requests {
             request.status = UNCONFIRMED;
     }
 
-    /** Folds a /data document in. Returns notices for writes that definitely did not take effect. */
+    /** Folds a /data document in. Returns failure reasons and completed screen-check feedback. */
     public List<String> reconcile(Object data, long now) {
         List<String> notices = new ArrayList<>();
         String serverId = Json.str(data, "server");
@@ -110,6 +112,10 @@ public final class Requests {
                     if ("failed".equals(requestStatus)) {
                         String errorMessage = Json.str(entry, "error");
                         notices.add(errorMessage == null ? "操作未执行" : errorMessage);
+                    } else if ("confirmed".equals(requestStatus) && "assistant".equals(request.key)) {
+                        String message = Json.str(entry, "message");
+                        if (message != null && !message.isEmpty())
+                            notices.add(message);
                     }
                     continue;
                 }
@@ -124,7 +130,7 @@ public final class Requests {
                 continue; // the record aged out; this document already reflects HA after it
             }
             // Otherwise this document predates the request (or the 202 has not arrived yet): keep waiting.
-            if (now - request.startedAt > GIVE_UP_MS) {
+            if (now - request.startedAt > ("assistant".equals(request.key) ? SCREEN_GIVE_UP_MS : GIVE_UP_MS)) {
                 requestIterator.remove();
                 notices.add("操作未确认，请核对设备状态");
             }

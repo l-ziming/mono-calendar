@@ -413,7 +413,13 @@ export function createApp(config, env, options = {}) {
       actionSeq,
       requests: [...requests.values()]
         .filter((r) => !r.settled || clockMs() - r.settled < REQUEST_MEMORY_MS)
-        .map((r) => ({ id: r.id, key: r.key, status: r.status, ...(r.error ? { error: r.error } : {}) })),
+        .map((r) => ({
+          id: r.id,
+          key: r.key,
+          status: r.status,
+          ...(r.message ? { message: r.message } : {}),
+          ...(r.error ? { error: r.error } : {}),
+        })),
     };
   }
   /** The hint icon's version: HA's image entity state changes whenever its picture does. */
@@ -574,14 +580,19 @@ export function createApp(config, env, options = {}) {
     }
     if (key === 'assistant') {
       // A late reply still lands in HA and shows on the next /data; only the 更新中 mark stops here.
-      const ok = await withinBudget(rewrite(), request.deadline);
-      await refreshStates().catch(() => {});
-      if (ok) {
-        settle(request, 'confirmed');
-        return data();
+      try {
+        const result = await withinBudget(rewrite(), request.deadline);
+        await refreshStates().catch(() => {});
+        if (result?.message) request.message = result.message;
+        if (result === true || result?.ok) {
+          settle(request, 'confirmed');
+          return data();
+        }
+        throw fail(503, result?.error || result?.message || '提示未更新');
+      } catch (error) {
+        settle(request, 'failed', error?.message || '提示未更新');
+        throw error;
       }
-      settle(request, 'failed', '提示未更新');
-      throw fail(503, '提示未更新');
     }
     try {
       const plan = await prepare(request, device);
@@ -1059,9 +1070,7 @@ export async function start(configPath, env) {
   await assistant.load();
   app.setAssistant(assistant);
   void assistant.warm();
-  if (writer.enabled) {
-    app.setRewrite(() => writer.refresh());
-  }
+  app.setRewrite(() => assistant.checkPanel());
   const interval = setInterval(() => {
     void app.refresh();
     void assistant.warm();

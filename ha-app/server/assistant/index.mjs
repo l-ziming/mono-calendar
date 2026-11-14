@@ -322,7 +322,11 @@ export class Assistant {
       this.busy = true;
       if (this.background) this.background.cancelled = true;
       if (this.active?.trigger !== 'chat') this.active?.controller.abort();
-    } else if (this.background) return this.background.promise;
+    } else if (this.background) {
+      if (trigger !== 'manual' || this.background.trigger !== 'scheduled') return this.background.promise;
+      this.background.cancelled = true;
+      this.background.controller.abort();
+    }
     const ticket = { id: randomUUID(), trigger, controller: new AbortController(), cancelled: false };
     const task = this.decisions
       .catch(() => {})
@@ -646,7 +650,11 @@ export class Assistant {
         record.results.screen = { status: 'rejected', reason: 'unknown_news_source' };
         return false;
       }
-      const result = await this.writer.publish(output.screen, { now: new Date(+now + Date.now() - started), signal });
+      const result = await this.writer.publish(output.screen, {
+        now: new Date(+now + Date.now() - started),
+        signal,
+        trigger,
+      });
       record.results.screen = result;
       record.reason = typeof output.screen.reason === 'string' ? output.screen.reason.slice(0, 240) : undefined;
       return ['updated', 'kept', 'cleared'].includes(result.status);
@@ -711,6 +719,32 @@ export class Assistant {
       signal,
     );
   }
+  async checkPanel(now = new Date()) {
+    if (!this.writer.enabled) throw fail(409, '屏幕提示尚未配置。');
+    const result = await this.decide('manual', now, { details: true });
+    const message =
+      {
+        updated: '便条已更新；屏幕下次同步时显示。',
+        cleared: '便条已清空；屏幕下次同步时显示。',
+        kept: result.reason === 'empty' ? '已检查，当前没有需要显示的便条。' : '已检查，保留原便条。',
+      }[result.status] ||
+      {
+        minimum_stay: `尚未达到 ${this.writer.settings.assistant_screen_min_minutes} 分钟的更新间隔，请稍后再试。`,
+        quiet_hours: '当前为屏幕静默时段，便条未修改。',
+        hourly_limit: '已达到每小时更新上限，请稍后再试。',
+        stale_version: '便条在检查期间发生变化，请重新检查。',
+        expired_keep: '原便条已过期，本次未生成有效替换，请重试。',
+        news_display_frequency: '本次新闻更新受到播报间隔限制，便条未修改。',
+        news_already_used: '本次新闻已播报，便条未修改。',
+        invalid_lines: '生成的便条格式不符合要求，请重试。',
+        invalid_line_width: '生成的便条超出屏幕行宽，请重试。',
+        write_not_confirmed: 'HA 未确认保存便条，请检查文本实体的长度限制。',
+        canceled: '本次检查被聊天打断，请稍后再试。',
+        superseded: '本次检查被聊天打断，请稍后再试。',
+      }[result.reason] ||
+      '本次检查未完成，便条未修改，请重试。';
+    return { ...result, message, ...(!result.ok ? { error: message } : {}) };
+  }
   async handle(req, res, pathname, readBody, reply) {
     if (pathname === '/assistant/state' && req.method === 'GET') {
       const settings = await this.writer.preferences();
@@ -748,30 +782,8 @@ export class Assistant {
       return reply(res, 200, { memory: await this.memory.replace(kind, text, revision) });
     }
     if (pathname === '/assistant/panel' && req.method === 'POST') {
-      if (!this.writer.enabled) throw fail(409, '屏幕提示尚未配置。');
-      const result = await this.decide('manual', new Date(), { details: true });
-      const message =
-        {
-          updated: '便条已更新；屏幕下次同步时显示。',
-          cleared: '便条已清空；屏幕下次同步时显示。',
-          kept: result.reason === 'empty' ? '已检查，当前没有需要显示的便条。' : '已检查，保留原便条。',
-        }[result.status] ||
-        {
-          minimum_stay: `尚未达到 ${this.writer.settings.assistant_screen_min_minutes} 分钟的更新间隔，请稍后再试。`,
-          quiet_hours: '当前为屏幕静默时段，便条未修改。',
-          hourly_limit: '已达到每小时更新上限，请稍后再试。',
-          stale_version: '便条在检查期间发生变化，请重新检查。',
-          expired_keep: '原便条已过期，本次未生成有效替换，请重试。',
-          news_display_frequency: '本次新闻更新受到播报间隔限制，便条未修改。',
-          news_already_used: '本次新闻已播报，便条未修改。',
-          invalid_lines: '生成的便条格式不符合要求，请重试。',
-          invalid_line_width: '生成的便条超出屏幕行宽，请重试。',
-          write_not_confirmed: 'HA 未确认保存便条，请检查文本实体的长度限制。',
-          canceled: '本次检查被聊天打断，请稍后再试。',
-          superseded: '本次检查被聊天打断，请稍后再试。',
-        }[result.reason] ||
-        '本次检查未完成，便条未修改，请重试。';
-      return reply(res, result.ok ? 200 : 503, { ...result, message, ...(!result.ok ? { error: message } : {}) });
+      const result = await this.checkPanel();
+      return reply(res, result.ok ? 200 : 503, result);
     }
     if (pathname !== '/assistant/chat' || req.method !== 'POST') return reply(res, 404, { error: 'not found' });
     const { message } = await readBody(req, 65536);
