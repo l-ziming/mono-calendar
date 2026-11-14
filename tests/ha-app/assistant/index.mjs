@@ -1102,57 +1102,88 @@ try {
   });
   await blockedScreen.assistant.load();
   assert.deepEqual(
-    await blockedScreen.assistant.decide('manual', now, { details: true }),
+    await blockedScreen.assistant.decide('scheduled', now, { details: true }),
     { ok: false, status: 'rejected', reason: 'minimum_stay' },
-    'Manual checks preserve the actual rejection reason',
+    'Scheduled checks preserve the actual rejection reason',
   );
   assert.equal(blockedScreen.writes.length, 0);
 
-  // The actual trigger reaches the writer: scheduled changes stay quiet; manual updates and clears may write.
+  // Automatic guards reject the same change that an explicit manual check may publish.
   const quietNow = new Date('2026-11-10T10:00:00Z'); // 03:00 in Denver
-  for (const action of ['update', 'clear']) {
-    let current = { state: '原有便条。', last_changed: new Date(+quietNow - 3600000).toISOString() };
-    const writes = [];
-    const quietScreen = harness({
-      config: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
-      ha: {
-        states: async (ids) => Object.fromEntries(ids.map((id) => [id, { ...current }])),
-        service: async (domain, name, payload) => {
-          writes.push(payload.value);
-          current = { state: payload.value, last_changed: quietNow.toISOString() };
-        },
-      },
-      context: async () => ({
-        ...structuredClone(context),
-        previous: { lines: current.state.split('\n'), at: current.last_changed },
-      }),
-      respond: (body) => {
-        const snapshot = requestSnapshot(body);
-        return toolStream([
-          {
-            name: 'screen',
-            arguments: {
-              action,
-              lines: action === 'update' ? ['新的便条。'] : [],
-              expires_at: action === 'update' ? snapshot.screen.suggested_expires_at : null,
-              base_version: snapshot.screen.version,
-            },
-          },
-        ]);
-      },
-    });
-    await quietScreen.assistant.load();
-    assert.deepEqual(await quietScreen.assistant.decide('scheduled', quietNow, { details: true }), {
-      ok: false,
-      status: 'rejected',
+  for (const { reason, at, limits, age } of [
+    {
       reason: 'quiet_hours',
-    });
-    assert.equal(writes.length, 0);
-    assert.deepEqual(await quietScreen.assistant.decide('manual', quietNow, { details: true }), {
-      ok: true,
-      status: action === 'update' ? 'updated' : 'cleared',
-    });
-    assert.deepEqual(writes, [action === 'update' ? '新的便条。' : '']);
+      at: quietNow,
+      age: 3600000,
+      limits: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
+    },
+    { reason: 'minimum_stay', at: now, age: 60000, limits: {} },
+    {
+      reason: 'hourly_limit',
+      at: now,
+      age: 3600000,
+      limits: { assistant_screen_min_minutes: 0, assistant_screen_max_per_hour: 1 },
+    },
+  ]) {
+    for (const action of ['update', 'clear']) {
+      let current = { state: '原有便条。', last_changed: new Date(+at - age).toISOString() };
+      let nextAction = action;
+      let nextLines = ['新的便条。'];
+      const writes = [];
+      const limitedScreen = harness({
+        config: limits,
+        ha: {
+          states: async (ids) => Object.fromEntries(ids.map((id) => [id, { ...current }])),
+          service: async (domain, name, payload) => {
+            writes.push(payload.value);
+            current = { state: payload.value, last_changed: at.toISOString() };
+          },
+        },
+        context: async () => ({
+          ...structuredClone(context),
+          previous: { lines: current.state ? current.state.split('\n') : [], at: current.last_changed },
+        }),
+        respond: (body) => {
+          const snapshot = requestSnapshot(body);
+          return toolStream([
+            {
+              name: 'screen',
+              arguments: {
+                action: nextAction,
+                lines: nextAction === 'update' ? nextLines : [],
+                expires_at: nextAction === 'update' ? snapshot.screen.suggested_expires_at : null,
+                base_version: snapshot.screen.version,
+              },
+            },
+          ]);
+        },
+      });
+      await limitedScreen.assistant.load();
+      const initialWrites = reason === 'hourly_limit' ? [+at - 60000] : [];
+      limitedScreen.assistant.writer.state.writes = initialWrites;
+      assert.deepEqual(await limitedScreen.assistant.decide('scheduled', at, { details: true }), {
+        ok: false,
+        status: 'rejected',
+        reason,
+      });
+      assert.equal(writes.length, 0);
+      assert.deepEqual(await limitedScreen.assistant.decide('manual', at, { details: true }), {
+        ok: true,
+        status: action === 'update' ? 'updated' : 'cleared',
+      });
+      assert.deepEqual(writes, [action === 'update' ? '新的便条。' : '']);
+      assert.equal(limitedScreen.assistant.writer.state.writes.length, initialWrites.length + 1);
+      if (reason === 'hourly_limit') {
+        nextAction = 'update';
+        nextLines = ['之后的定时便条。'];
+        // The older automatic write has left the rolling hour; the manual write alone still fills it.
+        assert.deepEqual(
+          await limitedScreen.assistant.decide('scheduled', new Date(+at + 3590000), { details: true }),
+          { ok: false, status: 'rejected', reason: 'hourly_limit' },
+        );
+        assert.equal(writes.length, 1);
+      }
+    }
   }
 
   let quietScheduledSignal;

@@ -14,7 +14,7 @@
 | `assistant_screen_times` | 06:30、11:30、16:30、21:00；最多 24 个 `HH:MM`，按配置时区执行；留空关闭 |
 | `assistant_screen_min_minutes` | 15；两次实际修改的最小间隔，可设 0–1440 分钟 |
 | `assistant_screen_max_per_hour` | 4；滚动一小时内的修改次数上限，可设 1–60 次；保持原内容不计数 |
-| `assistant_screen_quiet_start` / `assistant_screen_quiet_end` | 23:00 / 06:00；只限制定时更新，手动检查可更新；可跨午夜，起止时间相同则关闭静默 |
+| `assistant_screen_quiet_start` / `assistant_screen_quiet_end` | 23:00 / 06:00；可跨午夜，起止时间相同则关闭静默 |
 | `assistant_news_mode` | `morning_and_major`；也可选 `off`、`morning`，只影响屏幕内容 |
 | `assistant_news_interval_hours` | 6；重大新闻的最小间隔，可设 1–168 小时 |
 | `assistant_context_tokens` | 32768；可设 16384–131072 |
@@ -28,6 +28,8 @@
 | 屏幕文本、图片、新闻邮件实体 | 对应 `entities.assistant_text`、`assistant_image`、`newsletter`，保存即生效 |
 
 时区、城市、天气、设备映射和屏幕认证在 HA 配置中设置。
+
+手动检查跳过静默时段、最短间隔和每小时次数限制；实际修改仍计入滚动次数，定时更新继续受这些限制。
 
 ## 决策与资料
 

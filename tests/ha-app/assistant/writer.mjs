@@ -443,8 +443,8 @@ try {
       'Keeping or clearing an empty screen does not claim to retain an existing note',
     );
   assert.equal(empty.writes.length, 0, 'An empty no-op does not write or consume the update allowance');
-  for (const trigger of ['scheduled', 'manual'])
-    assert.equal((await empty.writer.publish(empty.action(), { now, trigger })).reason, 'minimum_stay');
+  assert.equal((await empty.writer.publish(empty.action(), { now })).reason, 'minimum_stay');
+  assert.equal((await empty.writer.publish(empty.action(), { now, trigger: 'manual' })).status, 'updated');
   const unconfiguredAge = harness({ assistant_screen_min_minutes: 0 });
   unconfiguredAge.current = { state: '', last_changed: now.toISOString() };
   assert.equal((await unconfiguredAge.writer.publish(unconfiguredAge.action(), { now })).status, 'updated');
@@ -469,8 +469,9 @@ try {
   );
   const limit = harness({ assistant_screen_max_per_hour: 1, assistant_screen_min_minutes: 0 });
   limit.writer.state.writes = [now.getTime() - 10000];
-  for (const trigger of ['scheduled', 'manual'])
-    assert.equal((await limit.writer.publish(limit.action(), { now, trigger })).reason, 'hourly_limit');
+  assert.equal((await limit.writer.publish(limit.action(), { now })).reason, 'hourly_limit');
+  assert.equal((await limit.writer.publish(limit.action(), { now, trigger: 'manual' })).status, 'updated');
+  assert.equal(limit.writer.state.writes.length, 2, 'Manual changes still count toward the next automatic update');
   const expired = harness();
   expired.writer.state.previous = { lines: expired.snapshot().lines, expires_at: now.toISOString() };
   assert.equal(
@@ -509,16 +510,18 @@ try {
   assert.equal(news.writer.state.morningNewsDay, '2026-11-09');
   const priorText = news.current.state;
   news.current = { state: '另一条有效便条。', last_changed: '2026-11-09T13:00:00Z' };
-  assert.equal(
-    (await news.writer.publish(news.action({ news_ids: ['news:test'] }), { now })).reason,
-    'news_already_used',
-  );
+  for (const trigger of ['scheduled', 'manual'])
+    assert.equal(
+      (await news.writer.publish(news.action({ news_ids: ['news:test'] }), { now, trigger })).reason,
+      'news_already_used',
+    );
   assert.notEqual(news.current.state, priorText);
   const newsOff = harness({ assistant_news_mode: 'off' });
-  assert.equal(
-    (await newsOff.writer.publish(newsOff.action({ news_ids: ['news:test'] }), { now })).reason,
-    'news_display_frequency',
-  );
+  for (const trigger of ['scheduled', 'manual'])
+    assert.equal(
+      (await newsOff.writer.publish(newsOff.action({ news_ids: ['news:test'] }), { now, trigger })).reason,
+      'news_display_frequency',
+    );
 
   const damagedPath = join(directory, 'damaged.json');
   await writeFile(damagedPath, '{broken');
