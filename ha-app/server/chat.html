@@ -661,23 +661,6 @@
                   ></label
                 >
                 <label class="setting"
-                  >两次更新至少间隔（分钟）<input
-                    id="assistant_screen_min_minutes"
-                    type="number"
-                    min="0"
-                    max="1440"
-                    required
-                    disabled /></label
-                ><label class="setting"
-                  >每小时最多更新次数<input
-                    id="assistant_screen_max_per_hour"
-                    type="number"
-                    min="1"
-                    max="60"
-                    required
-                    disabled
-                /></label>
-                <label class="setting"
                   >屏幕新闻<select id="assistant_news_mode" disabled>
                     <option value="off">不播报</option>
                     <option value="morning">仅早间</option>
@@ -864,8 +847,6 @@
         assistant_screen_times: 'list',
         assistant_screen_quiet_start: 'text',
         assistant_screen_quiet_end: 'text',
-        assistant_screen_min_minutes: 'number',
-        assistant_screen_max_per_hour: 'number',
         assistant_news_mode: 'text',
         assistant_news_interval_hours: 'number',
         llm_model: 'text',

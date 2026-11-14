@@ -46,8 +46,6 @@ options:
     - "11:30"
     - "16:30"
     - "21:00"
-  assistant_screen_min_minutes: 15
-  assistant_screen_max_per_hour: 4
   assistant_screen_quiet_start: "23:00"
   assistant_screen_quiet_end: "06:00"
   assistant_context_tokens: 32768
@@ -106,8 +104,6 @@ schema:
   assistant_news_interval_hours: "int(1,168)"
   assistant_screen_times:
     - str
-  assistant_screen_min_minutes: "int(0,1440)"
-  assistant_screen_max_per_hour: "int(1,60)"
   assistant_screen_quiet_start: str
   assistant_screen_quiet_end: str
   assistant_context_tokens: "int(16384,131072)"

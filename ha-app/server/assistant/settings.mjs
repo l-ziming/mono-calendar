@@ -1,8 +1,6 @@
 const initial = {
   assistant_presence_entities: [],
   assistant_screen_times: ['06:30', '11:30', '16:30', '21:00'],
-  assistant_screen_min_minutes: 15,
-  assistant_screen_max_per_hour: 4,
   assistant_screen_quiet_start: '23:00',
   assistant_screen_quiet_end: '06:00',
   assistant_context_tokens: 32768,
@@ -46,8 +44,6 @@ export function assistantSettings(options = {}, defaults = {}) {
   if (!validClockTime(result.assistant_screen_quiet_start) || !validClockTime(result.assistant_screen_quiet_end))
     throw new Error('Invalid assistant quiet hours: use HH:MM');
   for (const [key, min, max] of [
-    ['assistant_screen_min_minutes', 0, 1440],
-    ['assistant_screen_max_per_hour', 1, 60],
     ['assistant_context_tokens', 16384, 131072],
     ['assistant_memory_ttl_days', 1, 365],
   ])
@@ -76,7 +72,10 @@ const runtime = {
 export function assistantOptions(options = {}, defaults = {}) {
   const result = { ...assistantSettings(options, defaults) };
   for (const [key, fallback] of Object.entries(runtime)) result[key] = settingValue(options, defaults, key, fallback);
-  if (Object.keys(options).some((key) => !Object.hasOwn(result, key))) throw new Error('存在不支持的助手设置。');
+  // Older saved settings may still contain the removed screen throttles; do not retain them.
+  const removed = ['assistant_screen_min_minutes', 'assistant_screen_max_per_hour'];
+  if (Object.keys(options).some((key) => !Object.hasOwn(result, key) && !removed.includes(key)))
+    throw new Error('存在不支持的助手设置。');
   if (typeof result.assistant_prompt !== 'string' || result.assistant_prompt.length > 20000)
     throw new Error('提示词最多 20000 字符。');
   for (const [key, max] of [

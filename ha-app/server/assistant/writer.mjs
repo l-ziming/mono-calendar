@@ -434,13 +434,7 @@ export class AssistantWriter {
       if (operation === 'update' && sameLines(lines, current.lines) && !expired)
         return { status: 'kept', reason: 'unchanged' };
       if (trigger !== 'manual' && this.quiet(at)) return rejected('quiet_hours');
-      const changed = timestamp(current.at);
-      const last = Math.max(Number.isFinite(changed) ? changed : 0, this.state.writes.at(-1) || 0);
-      if (trigger !== 'manual' && last && at - last < this.settings.assistant_screen_min_minutes * 60000)
-        return rejected('minimum_stay');
       const recent = this.state.writes.filter((x) => Number.isFinite(x) && x > at - 3600000);
-      if (trigger !== 'manual' && recent.length >= this.settings.assistant_screen_max_per_hour)
-        return rejected('hourly_limit');
       const policy = this.newsPolicy(now);
       if (newsIds.length && policy.kind === 'none') return rejected('news_display_frequency');
       if (newsIds.some((id) => this.state.usedNews.includes(id))) return rejected('news_already_used');

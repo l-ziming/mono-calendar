@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { addonSettings } from '../../ha-app/server/addon.mjs';
-import { assistantSettings } from '../../ha-app/server/assistant/settings.mjs';
+import { assistantSettings, assistantOptions } from '../../ha-app/server/assistant/settings.mjs';
 
 const defaults = JSON.parse(await readFile(new URL('../../ha-app/config.example.json', import.meta.url), 'utf8'));
 const options = {
@@ -68,8 +68,8 @@ assert.deepEqual(
   ['person.user', 'device_tracker.phone', 'binary_sensor.home_reference'],
 );
 assert.deepEqual(local.config.assistant_screen_times, ['06:30', '11:30', '16:30', '21:00']);
-assert.equal(local.config.assistant_screen_min_minutes, 15);
-assert.equal(local.config.assistant_screen_max_per_hour, 4);
+assert.equal('assistant_screen_min_minutes' in local.config, false);
+assert.equal('assistant_screen_max_per_hour' in local.config, false);
 assert.equal(local.config.assistant_screen_quiet_start, '23:00');
 assert.equal(local.config.assistant_screen_quiet_end, '06:00');
 assert.equal(local.config.assistant_context_tokens, 32768);
@@ -89,8 +89,19 @@ const customized = addonSettings(
   'supervisor-test-token',
 );
 assert.deepEqual(customized.config.assistant_screen_times, ['00:00', '21:05']);
-assert.equal(customized.config.assistant_screen_min_minutes, 0);
-assert.equal(customized.config.assistant_screen_max_per_hour, 60);
+assert.equal('assistant_screen_min_minutes' in customized.config, false);
+assert.equal('assistant_screen_max_per_hour' in customized.config, false);
+const migrated = assistantOptions({
+  assistant_screen_min_minutes: 1440,
+  assistant_screen_max_per_hour: 1,
+  llm_api_key: 'preserved-test-key',
+  assistant_prompt: '保留原提示词。',
+});
+assert.equal('assistant_screen_min_minutes' in migrated, false);
+assert.equal('assistant_screen_max_per_hour' in migrated, false);
+assert.equal(migrated.llm_api_key, 'preserved-test-key');
+assert.equal(migrated.assistant_prompt, '保留原提示词。');
+assert.throws(() => assistantOptions({ unsupported_setting: true }));
 assert.equal(customized.config.assistant_screen_quiet_start, customized.config.assistant_screen_quiet_end);
 assert.equal(customized.config.assistant_context_tokens, 131072);
 assert.equal(customized.config.assistant_memory_ttl_days, 365);
@@ -119,16 +130,11 @@ for (const invalid of [
   { assistant_screen_times: Array(25).fill('06:30') },
   { assistant_screen_quiet_start: '12:60' },
   { assistant_screen_quiet_end: '25:00' },
-  { assistant_screen_min_minutes: -1 },
-  { assistant_screen_min_minutes: 1441 },
-  { assistant_screen_max_per_hour: 0 },
-  { assistant_screen_max_per_hour: 61 },
   { assistant_context_tokens: 16383 },
   { assistant_context_tokens: 131073 },
   { assistant_memory_ttl_days: 0 },
   { assistant_memory_ttl_days: 366 },
   { assistant_memory_ttl_days: 1.5 },
-  { assistant_screen_min_minutes: '15' },
 ]) {
   assert.throws(() => assistantSettings(invalid));
   assert.throws(() => addonSettings({ ...options, ...invalid }, defaults, 'supervisor-test-token'));

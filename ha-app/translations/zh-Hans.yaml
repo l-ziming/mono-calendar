@@ -86,12 +86,6 @@ configuration:
   assistant_screen_times:
     name: 屏幕固定检查时刻
     description: 按应用配置时区填写多个 HH:MM（24 小时制）时刻，最多 24 个；到点请求模型决定保持、更新或清空。空列表关闭自动检查，手动刷新仍可用。保存后下次检查生效。
-  assistant_screen_min_minutes:
-    name: 屏幕最短停留时间（分钟）
-    description: 两次实际修改屏幕之间的最短间隔，0～1440 分钟，默认 15。保存后下次检查生效。
-  assistant_screen_max_per_hour:
-    name: 屏幕每小时更新上限
-    description: 任意连续一小时内实际修改屏幕的次数上限，1～60，默认 4。保持屏幕不计次数。保存后下次检查生效。
   assistant_screen_quiet_start:
     name: 屏幕静默开始时刻
     description: 按应用配置时区填写 HH:MM，默认 23:00。静默期间不主动修改屏幕；开始和结束相同表示关闭静默。保存后下次检查生效。

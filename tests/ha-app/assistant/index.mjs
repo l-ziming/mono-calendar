@@ -1083,7 +1083,10 @@ try {
     'The next context read displays the saved note',
   );
 
-  const blockedScreen = harness({
+  let generatedNotes = 0;
+  const repeatedScreen = harness({
+    ha: emptyHa,
+    context: emptyContext,
     respond: (body) => {
       const snapshot = requestSnapshot(body);
       return toolStream([
@@ -1091,99 +1094,68 @@ try {
           name: 'screen',
           arguments: {
             action: 'update',
-            lines: ['新的便条。'],
+            lines: [`第${++generatedNotes}次自动便条。`],
             expires_at: snapshot.screen.suggested_expires_at,
             base_version: snapshot.screen.version,
-            news_ids: [],
           },
         },
       ]);
     },
   });
-  await blockedScreen.assistant.load();
-  assert.deepEqual(
-    await blockedScreen.assistant.decide('scheduled', now, { details: true }),
-    { ok: false, status: 'rejected', reason: 'minimum_stay' },
-    'Scheduled checks preserve the actual rejection reason',
-  );
-  assert.equal(blockedScreen.writes.length, 0);
+  await repeatedScreen.assistant.load();
+  repeatedScreen.assistant.writer.state.writes = Array(4).fill(+now - 1000);
+  for (let i = 0; i < 6; i++)
+    assert.deepEqual(await repeatedScreen.assistant.decide('scheduled', now, { details: true }), {
+      ok: true,
+      status: 'updated',
+    });
+  assert.equal(repeatedScreen.assistant.writer.state.writes.length, 10);
 
-  // Automatic guards reject the same change that an explicit manual check may publish.
+  // Automatic changes stay quiet; manual updates and clears may write at the same time.
   const quietNow = new Date('2026-11-10T10:00:00Z'); // 03:00 in Denver
-  for (const { reason, at, limits, age } of [
-    {
-      reason: 'quiet_hours',
-      at: quietNow,
-      age: 3600000,
-      limits: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
-    },
-    { reason: 'minimum_stay', at: now, age: 60000, limits: {} },
-    {
-      reason: 'hourly_limit',
-      at: now,
-      age: 3600000,
-      limits: { assistant_screen_min_minutes: 0, assistant_screen_max_per_hour: 1 },
-    },
-  ]) {
-    for (const action of ['update', 'clear']) {
-      let current = { state: '原有便条。', last_changed: new Date(+at - age).toISOString() };
-      let nextAction = action;
-      let nextLines = ['新的便条。'];
-      const writes = [];
-      const limitedScreen = harness({
-        config: limits,
-        ha: {
-          states: async (ids) => Object.fromEntries(ids.map((id) => [id, { ...current }])),
-          service: async (domain, name, payload) => {
-            writes.push(payload.value);
-            current = { state: payload.value, last_changed: at.toISOString() };
-          },
+  for (const action of ['update', 'clear']) {
+    let current = { state: '原有便条。', last_changed: new Date(+quietNow - 3600000).toISOString() };
+    const writes = [];
+    const quietScreen = harness({
+      config: { assistant_screen_quiet_start: '01:00', assistant_screen_quiet_end: '06:00' },
+      ha: {
+        states: async (ids) => Object.fromEntries(ids.map((id) => [id, { ...current }])),
+        service: async (domain, name, payload) => {
+          writes.push(payload.value);
+          current = { state: payload.value, last_changed: quietNow.toISOString() };
         },
-        context: async () => ({
-          ...structuredClone(context),
-          previous: { lines: current.state ? current.state.split('\n') : [], at: current.last_changed },
-        }),
-        respond: (body) => {
-          const snapshot = requestSnapshot(body);
-          return toolStream([
-            {
-              name: 'screen',
-              arguments: {
-                action: nextAction,
-                lines: nextAction === 'update' ? nextLines : [],
-                expires_at: nextAction === 'update' ? snapshot.screen.suggested_expires_at : null,
-                base_version: snapshot.screen.version,
-              },
+      },
+      context: async () => ({
+        ...structuredClone(context),
+        previous: { lines: current.state ? current.state.split('\n') : [], at: current.last_changed },
+      }),
+      respond: (body) => {
+        const snapshot = requestSnapshot(body);
+        return toolStream([
+          {
+            name: 'screen',
+            arguments: {
+              action,
+              lines: action === 'update' ? ['新的便条。'] : [],
+              expires_at: action === 'update' ? snapshot.screen.suggested_expires_at : null,
+              base_version: snapshot.screen.version,
             },
-          ]);
-        },
-      });
-      await limitedScreen.assistant.load();
-      const initialWrites = reason === 'hourly_limit' ? [+at - 60000] : [];
-      limitedScreen.assistant.writer.state.writes = initialWrites;
-      assert.deepEqual(await limitedScreen.assistant.decide('scheduled', at, { details: true }), {
-        ok: false,
-        status: 'rejected',
-        reason,
-      });
-      assert.equal(writes.length, 0);
-      assert.deepEqual(await limitedScreen.assistant.decide('manual', at, { details: true }), {
-        ok: true,
-        status: action === 'update' ? 'updated' : 'cleared',
-      });
-      assert.deepEqual(writes, [action === 'update' ? '新的便条。' : '']);
-      assert.equal(limitedScreen.assistant.writer.state.writes.length, initialWrites.length + 1);
-      if (reason === 'hourly_limit') {
-        nextAction = 'update';
-        nextLines = ['之后的定时便条。'];
-        // The older automatic write has left the rolling hour; the manual write alone still fills it.
-        assert.deepEqual(
-          await limitedScreen.assistant.decide('scheduled', new Date(+at + 3590000), { details: true }),
-          { ok: false, status: 'rejected', reason: 'hourly_limit' },
-        );
-        assert.equal(writes.length, 1);
-      }
-    }
+          },
+        ]);
+      },
+    });
+    await quietScreen.assistant.load();
+    assert.deepEqual(await quietScreen.assistant.decide('scheduled', quietNow, { details: true }), {
+      ok: false,
+      status: 'rejected',
+      reason: 'quiet_hours',
+    });
+    assert.equal(writes.length, 0);
+    assert.deepEqual(await quietScreen.assistant.decide('manual', quietNow, { details: true }), {
+      ok: true,
+      status: action === 'update' ? 'updated' : 'cleared',
+    });
+    assert.deepEqual(writes, [action === 'update' ? '新的便条。' : '']);
   }
 
   let quietScheduledSignal;
@@ -1382,11 +1354,11 @@ try {
   assert.equal(emptyPanel.code, 200);
   assert.equal(emptyPanel.json().reason, 'empty');
   assert.equal(emptyPanel.json().message, '已检查，当前没有需要显示的便条。');
-  panelResult = { ok: false, status: 'rejected', reason: 'minimum_stay' };
+  panelResult = { ok: false, status: 'rejected', reason: 'invalid_lines' };
   const blockedPanel = await request('POST', '/assistant/panel', {});
   assert.equal(blockedPanel.code, 503);
-  assert.equal(blockedPanel.json().reason, 'minimum_stay');
-  assert.match(blockedPanel.json().error, /15 分钟/);
+  assert.equal(blockedPanel.json().reason, 'invalid_lines');
+  assert.match(blockedPanel.json().error, /格式/);
   panelResult = { ok: true, status: 'updated' };
   assert.match((await request('POST', '/assistant/panel', {})).json().message, /屏幕下次同步/);
 

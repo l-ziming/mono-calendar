@@ -11,8 +11,6 @@ const config = {
   timezone: 'America/Denver',
   entities: { assistant_text: 'input_text.mono_calendar_assistant' },
   assistant_screen_times: ['08:00'],
-  assistant_screen_min_minutes: 15,
-  assistant_screen_max_per_hour: 4,
   assistant_screen_quiet_start: '23:00',
   assistant_screen_quiet_end: '06:00',
 };
@@ -271,7 +269,7 @@ try {
   assert.equal(failedChecks, 4, 'Configured screen slots remain independent of exhausted expiry retries');
 
   for (const operation of ['keep', 'clear']) {
-    const handled = harness({ assistant_screen_min_minutes: 0 });
+    const handled = harness();
     const expiresAt = '2026-11-09T17:00:00Z';
     handled.writer.state.previous = { lines: handled.snapshot().lines, expires_at: expiresAt };
     if (operation === 'keep') handled.current = { state: '', last_changed: now.toISOString() };
@@ -326,7 +324,7 @@ try {
   let settings = {
     assistant_prompt: '新提示词。',
     assistant_screen_times: ['09:00'],
-    assistant_screen_min_minutes: 2,
+    assistant_screen_quiet_start: '22:00',
     assistant_news_mode: 'morning',
     assistant_news_interval_hours: 3,
   };
@@ -341,15 +339,15 @@ try {
     return true;
   });
   assert.equal(await hot.writer.tick(now), false);
-  assert.equal(hot.writer.settings.assistant_screen_min_minutes, 2);
+  assert.equal(hot.writer.settings.assistant_screen_quiet_start, '22:00');
   assert.equal(await hot.writer.tick(new Date('2026-11-09T16:00:00Z')), true);
   assert.equal(hotChecks, 1);
-  settings = { ...settings, assistant_prompt: '更新后的提示词。', assistant_screen_min_minutes: 3 };
+  settings = { ...settings, assistant_prompt: '更新后的提示词。', assistant_screen_quiet_start: '21:00' };
   assert.equal(await hot.writer.readPrompt(), '新提示词。');
-  assert.equal(hot.writer.settings.assistant_screen_min_minutes, 2, 'Reading a prompt does not refresh live settings');
+  assert.equal(hot.writer.settings.assistant_screen_quiet_start, '22:00', 'Reading a prompt does not refresh live settings');
   await hot.writer.refreshSettings();
   assert.equal(await hot.writer.readPrompt(), '更新后的提示词。');
-  assert.equal(hot.writer.settings.assistant_screen_min_minutes, 3);
+  assert.equal(hot.writer.settings.assistant_screen_quiet_start, '21:00');
   settings = { ...settings, assistant_screen_times: ['25:00'] };
   await hot.writer.refreshSettings();
   assert.deepEqual(
@@ -403,16 +401,15 @@ try {
   const formerExpiry = published.writer.state.previous.expires_at;
   assert.equal((await published.writer.publish(published.action(), { now })).status, 'kept');
   assert.equal(published.writer.state.previous.expires_at, formerExpiry, 'Repeated text does not extend expiry');
-  assert.equal(
-    (await published.writer.publish(published.action({ action: 'clear', lines: [], expires_at: null }), { now }))
-      .reason,
-    'minimum_stay',
+  assert.deepEqual(
+    await published.writer.publish(published.action({ action: 'clear', lines: [], expires_at: null }), { now }),
+    { status: 'cleared' },
   );
   assert.deepEqual(
     await published.writer.publish(published.action({ action: 'clear', lines: [], expires_at: null }), {
       now: new Date('2026-11-09T15:16:00Z'),
     }),
-    { status: 'cleared' },
+    { status: 'kept', reason: 'empty' },
   );
   assert.equal(published.current.state, '');
 
@@ -443,11 +440,8 @@ try {
       'Keeping or clearing an empty screen does not claim to retain an existing note',
     );
   assert.equal(empty.writes.length, 0, 'An empty no-op does not write or consume the update allowance');
-  assert.equal((await empty.writer.publish(empty.action(), { now })).reason, 'minimum_stay');
-  assert.equal((await empty.writer.publish(empty.action(), { now, trigger: 'manual' })).status, 'updated');
-  const unconfiguredAge = harness({ assistant_screen_min_minutes: 0 });
-  unconfiguredAge.current = { state: '', last_changed: now.toISOString() };
-  assert.equal((await unconfiguredAge.writer.publish(unconfiguredAge.action(), { now })).status, 'updated');
+  assert.equal((await empty.writer.publish(empty.action(), { now })).status, 'updated');
+  assert.equal((await empty.writer.publish(empty.action(), { now, trigger: 'manual' })).status, 'kept');
 
   const quiet = harness();
   assert.equal(
@@ -467,11 +461,17 @@ try {
     ).status,
     'updated',
   );
-  const limit = harness({ assistant_screen_max_per_hour: 1, assistant_screen_min_minutes: 0 });
-  limit.writer.state.writes = [now.getTime() - 10000];
-  assert.equal((await limit.writer.publish(limit.action(), { now })).reason, 'hourly_limit');
-  assert.equal((await limit.writer.publish(limit.action(), { now, trigger: 'manual' })).status, 'updated');
-  assert.equal(limit.writer.state.writes.length, 2, 'Manual changes still count toward the next automatic update');
+  const rapid = harness();
+  rapid.writer.state.writes = Array(4).fill(+now - 1000);
+  for (let i = 0; i < 6; i++)
+    assert.equal(
+      (await rapid.writer.publish(rapid.action({ lines: [`第${i + 1}次连续更新。`] }), { now })).status,
+      'updated',
+      'Recent HA changes and existing write history do not limit automatic updates',
+    );
+  assert.equal(rapid.writes.length, 6);
+  assert.equal(rapid.writer.state.writes.length, 10);
+  assert.equal(rapid.snapshot().last_pushed_at, now.toISOString());
   const expired = harness();
   expired.writer.state.previous = { lines: expired.snapshot().lines, expires_at: now.toISOString() };
   assert.equal(
@@ -504,7 +504,7 @@ try {
   );
   assert.equal(canceled.writes.length, 0);
 
-  const news = harness({ assistant_screen_min_minutes: 0 });
+  const news = harness();
   assert.equal((await news.writer.publish(news.action({ news_ids: ['news:test'] }), { now })).status, 'updated');
   assert.ok(news.writer.state.usedNews.includes('news:test'));
   assert.equal(news.writer.state.morningNewsDay, '2026-11-09');
@@ -529,7 +529,7 @@ try {
   await damaged.writer.load();
   assert.equal((await damaged.writer.publish(damaged.action(), { now })).reason, 'schedule_state_unavailable');
   console.log(
-    'Assistant screen: fixed configured slots/hot reload/DST/restart, unified decision delegation, independent action validation, fresh versions, quiet/minimum/hour guards, confirmed writes and LLM options checked.',
+    'Assistant screen: fixed configured slots/hot reload/DST/restart, unified decision delegation, independent action validation, fresh versions, quiet hours, unrestricted update frequency, confirmed writes and LLM options checked.',
   );
 } finally {
   await rm(directory, { recursive: true, force: true });

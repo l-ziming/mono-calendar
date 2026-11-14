@@ -729,9 +729,7 @@ export class Assistant {
         kept: result.reason === 'empty' ? '已检查，当前没有需要显示的便条。' : '已检查，保留原便条。',
       }[result.status] ||
       {
-        minimum_stay: `尚未达到 ${this.writer.settings.assistant_screen_min_minutes} 分钟的更新间隔，请稍后再试。`,
         quiet_hours: '当前为屏幕静默时段，便条未修改。',
-        hourly_limit: '已达到每小时更新上限，请稍后再试。',
         stale_version: '便条在检查期间发生变化，请重新检查。',
         expired_keep: '原便条已过期，本次未生成有效替换，请重试。',
         news_display_frequency: '本次新闻更新受到播报间隔限制，便条未修改。',

@@ -86,12 +86,6 @@ configuration:
   assistant_screen_times:
     name: Fixed screen check times
     description: Up to 24 HH:MM times in the configured time zone. Each check asks the model to keep, update or clear the screen. An empty list disables automatic checks; manual refresh remains available. Reloaded next check.
-  assistant_screen_min_minutes:
-    name: Minimum screen dwell time (minutes)
-    description: Minimum interval between actual screen changes, 0–1440 minutes, default 15. Reloaded next check.
-  assistant_screen_max_per_hour:
-    name: Maximum screen updates per hour
-    description: Maximum actual screen changes in a rolling hour, 1–60, default 4. Keeping the screen does not count. Reloaded next check.
   assistant_screen_quiet_start:
     name: Screen quiet hours start
     description: HH:MM in the configured time zone, default 23:00. No proactive screen changes during quiet hours. Equal start and end times disable quiet hours. Reloaded next check.
