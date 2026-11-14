@@ -14,7 +14,7 @@ There are two parts: Home Assistant and the RP1. Home Assistant collects room an
 
 ![Screen sample](docs/images/sample.png)
 
-The sample was drawn on a desktop with `Page.java`. Current HA App version: 0.10.3 (experimental). You'll need a rooted RP1.
+The sample was drawn on a desktop with `Page.java`. Current HA App version: 0.10.4 (experimental). You'll need a rooted RP1.
 
 The interface is in Chinese. If you'd like an English version, let me know or [support the project](https://github.com/sponsors/l-ziming).
 
