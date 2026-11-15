@@ -27,7 +27,7 @@ Change log:
 #define _MLAN_DECL_H_
 
 /** MLAN release version */
-#define MLAN_RELEASE_VERSION		 "C509.p2-rp1fix8"
+#define MLAN_RELEASE_VERSION		 "C509.p2-rp1-1.0.0"
 
 /** Re-define generic data types for MLAN/MOAL */
 /** Signed char (1-byte) */

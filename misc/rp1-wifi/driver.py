@@ -18,7 +18,7 @@ import time
 PACKAGE = Path(__file__).resolve().parent
 PROJECT = PACKAGE.parents[1]
 REMOTE = '/data/local/tmp/mono-calendar-wifi-patch'
-VERSION = 'C509.p2-rp1fix8'
+VERSION = 'C509.p2-rp1-1.0.0'
 MODULES = ('mlan8897', 'sd8897')
 BOOT = '/dev/block/platform/soc.2/by-name/boot'
 
@@ -137,7 +137,7 @@ class Device:
         }
         if record['before']['override'] == 'present':
             version = self.shell('cat /system/lib/modules/.mono-calendar-version')
-            if version not in (VERSION, 'C509.p2-rp1fix7', 'C509.p2-rp1fix6', 'C509.p2-rp1fix5', 'C509.p2-rp1fix4', 'C509.p2-rp1fix3', 'C509.p2-rp1fix1'):
+            if version not in (VERSION, 'C509.p2-rp1fix8', 'C509.p2-rp1fix7', 'C509.p2-rp1fix6', 'C509.p2-rp1fix5', 'C509.p2-rp1fix4', 'C509.p2-rp1fix3', 'C509.p2-rp1fix1'):
                 raise RuntimeError('优先目录的补丁版本未知，未修改设备')
             previous = directory / 'previous'
             previous.mkdir(mode=0o700)

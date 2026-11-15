@@ -32,7 +32,7 @@
 +++ b/mlan/mlan_decl.h
 @@ -30 +30 @@
 -#define MLAN_RELEASE_VERSION		 "C509.p2"
-+#define MLAN_RELEASE_VERSION		 "C509.p2-rp1fix8"
++#define MLAN_RELEASE_VERSION		 "C509.p2-rp1-1.0.0"
 --- a/mlan/mlan_main.h
 +++ b/mlan/mlan_main.h
 @@ -39,0 +40,5 @@
@@ -57,7 +57,7 @@
 +++ b/mlinux/mlan_decl.h
 @@ -30 +30 @@
 -#define MLAN_RELEASE_VERSION		 "C509.p2"
-+#define MLAN_RELEASE_VERSION		 "C509.p2-rp1fix8"
++#define MLAN_RELEASE_VERSION		 "C509.p2-rp1-1.0.0"
 --- a/mlinux/moal_eth_ioctl.c
 +++ b/mlinux/moal_eth_ioctl.c
 @@ -3630 +3630 @@

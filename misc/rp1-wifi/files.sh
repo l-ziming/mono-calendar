@@ -9,7 +9,7 @@ mounts=/proc/mounts
 base=$(cd "$("$busybox" dirname "$0")" && pwd)
 target=$system/lib/modules
 stage=$system/lib/.mono-calendar-wifi.$$
-version=C509.p2-rp1fix8
+version=C509.p2-rp1-1.0.0
 fix1_mlan=d6272d7006a11abe37f0cd2dfdacd9cfd1207a9b431270370fd361f89d4b8009
 fix1_sd=be5c9c74796495a23919c5ee0f29a077ab16d0113362055faaecf6689c96e445
 previous_version=C509.p2-rp1fix3
@@ -23,8 +23,10 @@ fix6_mlan=28c4003df76fef07fa5e2f7a2b22731a0109890d5a2a47e47ac41c8c800125f4
 fix6_sd=21b83ee65baf6ba674a055e4456ff93caf72e0bff425a94a346d4e0ef18fa226
 fix7_mlan=62a027b63924daba95b1731826c2b367dc9d40149a2dae49b3864fb187409e72
 fix7_sd=8e63c529f3460d0a0659b89ae7f1e22f108ee849af90bcd85a188cbd7fc57964
-patched_mlan=2f46329c4c4aec1ec831662b1a18fc10466579f013ae15bbebe0b77af722ba3b
-patched_sd=153dc65d8079bbdf602fd184af2a8914cf09edd54b8ae84869ae0ee1b7c7c6e4
+fix8_mlan=2f46329c4c4aec1ec831662b1a18fc10466579f013ae15bbebe0b77af722ba3b
+fix8_sd=153dc65d8079bbdf602fd184af2a8914cf09edd54b8ae84869ae0ee1b7c7c6e4
+patched_mlan=c10a75c12b235427a7399c6932a688e78bb5d44a6e69f57ba434cfa022fdba06
+patched_sd=9b64a5b6fc2bb2e950d317b5859c8f1a8d41f24e8f9bc75068f434a8c46a4460
 original_mlan=d84cee773f51eaad70c8743f9ad5402e3ff0638e3b418a4263766c7a546002e4
 original_sd=02749c69bb603e0b3c1518014ff02d03e9e78fe6818b2b814db35318abacd8f7
 stage_owned=0
@@ -74,6 +76,7 @@ check_target() {
         C509.p2-rp1fix5) target_mlan=$fix5_mlan; target_sd=$fix5_sd ;;
         C509.p2-rp1fix6) target_mlan=$fix6_mlan; target_sd=$fix6_sd ;;
         C509.p2-rp1fix7) target_mlan=$fix7_mlan; target_sd=$fix7_sd ;;
+        C509.p2-rp1fix8) target_mlan=$fix8_mlan; target_sd=$fix8_sd ;;
         *) fail "Unknown module version: $target" ;;
     esac
     check_hash "$target/mlan8897.ko" "$target_mlan"

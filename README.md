@@ -14,7 +14,7 @@
 
 ![屏幕样例](docs/images/sample.png)
 
-样例由 `Page.java` 在桌面绘制。当前版本：HA App 0.10.6（experimental）。这是按我自己的 RP1 与 Home Assistant 环境开发和验证的个人项目，复现需要 root 过的 RP1。
+样例由 `Page.java` 在桌面绘制。当前版本：1.0.0（HA 与 RP1）。这是按我自己的 RP1 与 Home Assistant 环境开发和验证的个人项目，复现需要 root 过的 RP1。
 
 ## 组成
 
@@ -22,6 +22,8 @@
 | --- | --- |
 | RP1 App | Android 5.1 / ARMv7，1650×2200 灰度屏 |
 | HA App | Home Assistant App，Node.js 24（Docker，amd64 / aarch64） |
+
+发布包的 `ha/` 包含 HA App，`rp1/` 包含屏幕端 APK、配置工具和 Wi-Fi 驱动，安装步骤见包内 `README.md`。驱动仅适用于已 root 且内核匹配的 DPT-RP1。
 
 ## 拆机资料
 
@@ -52,9 +54,11 @@ tests/             回归测试：ha-app/ 模拟 HA 与模型，android/ 屏幕�
 
 GitHub Actions 会在提交和 PR 时自动运行测试；在 Actions 页手动运行检查时，可以选择 Android 桌面渲染，并下载生成的样例图。
 
+配置 Android 构建环境后，运行 `python3 scripts/package-release.py` 构建并生成 `dist/mono-calendar-<版本>.zip`。打包会检查 HA、RP1 和驱动版本一致，并使用已有签名密钥。
+
 ## RP1 系统调整
 
-除了应用本身，也针对这台 RP1 的待机做了一些系统调整。目前还不提供让其他设备直接安装的发布包：
+除了应用本身，也针对这台 RP1 的待机做了一些系统调整：
 
 1. **待机唤醒过于频繁**：原厂固件每 20 秒做一次网络检查，常驻 mDNS 设备发现，Wi-Fi 也不过滤与本机无关的广播，待机时 CPU 被反复唤醒，影响续航。现在延长了检查间隔、停用了发现服务，并在 Wi-Fi 固件层配置了仅休眠时生效的白名单，见 [系统调优记录](docs/rp1-tuning.md)。
 2. **待机恢复偶发卡死**：原厂 Wi-Fi 驱动在从待机恢复时查询唤醒原因，偶尔会超时并卡住整个恢复流程，屏幕停止刷新，只能按 RESET。已修补驱动的超时、等待和失败清理逻辑，源码、构建和回退方法见 [驱动补丁](misc/rp1-wifi/README.md)。

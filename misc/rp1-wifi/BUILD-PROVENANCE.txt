@@ -1,4 +1,4 @@
-RP1 Wi-Fi driver build: C509.p2-rp1fix8
+RP1 Wi-Fi driver build: C509.p2-rp1-1.0.0
 Build date: 2026-11-15 (America/Denver)
 
 Inputs
@@ -20,7 +20,7 @@ Run build-driver.sh as described in README.md. It downloads and checks the
 compiler when absent, prepares external kernel headers, and builds the paired
 modules in source/wlan_src without modifying the Sony kernel source.
 
-The installed pair was built from the repository root with retained tools:
+The release pair was built from the repository root with retained tools:
   RP1_TOOLCHAIN_DIR=/private/tmp/rp1-wifi-driver-build/aosp-gcc48 RP1_BUILD_DIR=/private/tmp/rp1-wifi-driver-build/kernel-build bash misc/rp1-wifi/build-driver.sh
 
 Required flags and ABI
@@ -30,7 +30,7 @@ Required flags and ABI
 - Host tools use Apple clang -arch x86_64 and -Wl,-no_pie, with the retained
   ELF header. NDK clang 18 is unsuitable for this unmodified kernel: the local
   register asm("sp") used by current_thread_info is miscompiled.
-- Both modules are ARMv7 EABI5, version C509.p2-rp1fix8, with vermagic
+- Both modules are ARMv7 EABI5, version C509.p2-rp1-1.0.0, with vermagic
   "3.14.35 SMP preempt mod_unload ARMv7 " and a 0x178 module structure.
 - MLAN retains all 14 factory exports and 5 imports. The 252 sd8897 imports
   resolve against the paired module and 7416 cached device exports. No GOT
@@ -42,7 +42,7 @@ Required flags and ABI
   these modules, the source, installer, cumulative patch and test fixture.
   resume-fix.patch is regenerated against pristine C509.p2.
 
-Whitelist and validation
+Whitelist and validation scope
 The seven mode-1 entries total 356 bytes and match the physically tested
 whitelist-reference.entries.bin byte for byte for its recorded IPv4/MAC.
 Reference SHA256: 602c9c234d1b002156821b3ac3e88a552f4a545640440dd517e6d72eeff83f0e
@@ -50,20 +50,9 @@ The worker rebuilds for address changes. Successful STA MAC changes queue the
 same asynchronous rebuild; firmware programming remains outside PM callbacks.
 The earlier broadcast-blacklist /proc interface has been removed.
 
-Host checks pass under ASan/UBSan: the actual builder, packet matching, dynamic
-IPv4/MAC, request ownership, failure cleanup and temporary negative controls.
-The installer tests cover upgrades, interruption recovery and rollback.
-
-Installed on the RP1, then independently unloaded/re-enabled Wi-Fi. Both fix8
-modules loaded from /system/lib/modules and prepared the whitelist without a
-manual MEF command. Boot and factory-module hashes were unchanged; /system
-and its block device returned to read-only.
-
-Online firmware-HS tests kept the driver-managed table enabled: own IPv4 and
-client DHCP DF0/DF1 passed; unrelated broadcasts and other-client DHCP were
-blocked in HS and received awake. Multicast had no awake delivery control and
-was not counted as a pass. Cleanup left HS inactive, the original HS cache,
-filter=Y and diagnostic=N. Real DHCP REQUEST/ACK and the existing 15:45 local
-sync also passed. These USB checks do not measure CPU deep sleep or energy.
-The separate battery test used the byte-identical temporary table; its scope
-and results are recorded in ../../docs/rp1-tuning.md.
+Version 1.0.0 changes release identifiers from the previous functionally
+equivalent build. Host source checks use ASan/UBSan, and installer checks cover
+recognized older versions, interrupted upgrades and rollback. The rebuilt
+1.0.0 modules have not been installed on the device as part of packaging.
+The same whitelist and driver logic were checked on the RP1 in the previous
+build. Battery savings have not been quantified.

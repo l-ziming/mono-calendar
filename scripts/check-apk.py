@@ -1,12 +1,21 @@
 import pathlib
+import re
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 
+project_root = pathlib.Path(__file__).resolve().parents[1]
+manifest = ET.parse(project_root / 'android/AndroidManifest.xml').getroot()
+android = '{http://schemas.android.com/apk/res/android}'
+version = manifest.get(android + 'versionName')
+version_code = manifest.get(android + 'versionCode')
+ha_version = re.search(r'^version: "([^"]+)"$', (project_root / 'ha-app/config.yaml').read_text(), re.M).group(1)
+assert version == ha_version, 'HA and RP1 versions must match'
 apk_path, badging_path = map(pathlib.Path, sys.argv[1:])
 text = badging_path.read_text()
 assert "sdkVersion:'22'" in text and "targetSdkVersion:'22'" in text
 assert "package: name='dev.monocalendar.rp1'" in text
-assert "versionCode='19'" in text and "versionName='0.7.9'" in text
+assert f"versionCode='{version_code}'" in text and f"versionName='{version}'" in text
 assert 'CHANGE_WIFI_STATE' not in text, 'The App must not control Wi-Fi'
 with zipfile.ZipFile(apk_path) as archive:
     members = set(archive.namelist())
@@ -43,4 +52,4 @@ with zipfile.ZipFile(apk_path) as archive:
         table_tags = {font_data[12 + 16 * index : 16 + 16 * index] for index in range(table_count)}
         assert b'cmap' in table_tags and b'name' in table_tags and b'fvar' not in table_tags
         assert archive.read('assets/fonts/' + license_name).strip(), 'Font license required'
-print('APK 0.7.9, API 22, ARMv7, JNI, almanac, eleven bundled fonts/licenses, no Wi-Fi control checked')
+print(f'APK {version}, API 22, ARMv7, JNI, almanac, eleven bundled fonts/licenses, no Wi-Fi control checked')

@@ -14,7 +14,7 @@ There are two parts: Home Assistant and the RP1. Home Assistant collects room an
 
 ![Screen sample](docs/images/sample.png)
 
-The sample was drawn on a desktop with `Page.java`. Current HA App version: 0.10.6 (experimental). You'll need a rooted RP1.
+The sample was drawn on a desktop with `Page.java`. Current version: 1.0.0 (HA and RP1). You'll need a rooted RP1.
 
 The interface is in Chinese. If you'd like an English version, let me know or [support the project](https://github.com/sponsors/l-ziming).
 
@@ -24,6 +24,8 @@ The interface is in Chinese. If you'd like an English version, let me know or [s
 | --- | --- |
 | RP1 App | Android 5.1 / ARMv7, 1650×2200 grayscale display |
 | HA App | Home Assistant App, Node.js 24 (Docker, amd64 / aarch64) |
+
+The release package has `ha/` for the HA App and `rp1/` for the display APK, configuration tool and Wi-Fi driver. Follow the package's `README.md` to install. The driver requires a rooted DPT-RP1 with a matching kernel.
 
 ## Teardown
 
@@ -53,9 +55,11 @@ Run `bash scripts/check.sh` from the repository root with Node.js 24 and Python 
 
 GitHub Actions runs tests on pushes and pull requests. When running the workflow manually, you can also enable Android desktop rendering and download the sample images.
 
+With the Android build environment configured, run `python3 scripts/package-release.py` to build `dist/mono-calendar-<version>.zip`. Packaging checks that HA, RP1 and driver versions match and uses the existing signing key.
+
 ## RP1 system changes
 
-I've also made some standby changes to my RP1's system software. There isn't a ready-to-install release for other devices:
+I've also made some standby changes to my RP1's system software:
 
 1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. I extended the check interval, disabled discovery, and added a firmware whitelist that acts only during host sleep. See the [system notes](docs/rp1-tuning.md) (Chinese).
 2. **Occasional hangs after standby**: the Wi-Fi driver can time out while checking the wake reason, leaving the screen stuck until I press RESET. The patch fixes timeout notification, wait handling and failure cleanup. See the [driver source, build and rollback instructions](misc/rp1-wifi/README.md) (Chinese).

@@ -87,7 +87,8 @@ class FilesTest(unittest.TestCase):
                             ('fix4_mlan', 'mlan8897'), ('fix4_sd', 'sd8897'),
                             ('fix5_mlan', 'mlan8897'), ('fix5_sd', 'sd8897'),
                             ('fix6_mlan', 'mlan8897'), ('fix6_sd', 'sd8897'),
-                            ('fix7_mlan', 'mlan8897'), ('fix7_sd', 'sd8897')]:
+                            ('fix7_mlan', 'mlan8897'), ('fix7_sd', 'sd8897'),
+                            ('fix8_mlan', 'mlan8897'), ('fix8_sd', 'sd8897')]:
             digest = hashlib.sha256((BUNDLE / 'original' / (module + '.ko')).read_bytes()).hexdigest()
             source, count = re.subn(r'^' + key + r'=.*$', key + '=' + digest, source, flags=re.M)
             self.assertEqual(count, 1)
@@ -159,11 +160,11 @@ class FilesTest(unittest.TestCase):
         return {path.name: path.read_bytes() for path in self.target.iterdir()}
 
     def test_upgrade_replaces_the_recognized_previous_pair(self):
-        for version in ('C509.p2-rp1fix1', 'C509.p2-rp1fix3', 'C509.p2-rp1fix4', 'C509.p2-rp1fix5', 'C509.p2-rp1fix6', 'C509.p2-rp1fix7'):
+        for version in ('C509.p2-rp1fix1', 'C509.p2-rp1fix3', 'C509.p2-rp1fix4', 'C509.p2-rp1fix5', 'C509.p2-rp1fix6', 'C509.p2-rp1fix7', 'C509.p2-rp1fix8'):
             with self.subTest(version=version):
                 self.previous_pair(version)
                 self.run_action('install')
-                self.assertEqual((self.target / '.mono-calendar-version').read_text(), 'C509.p2-rp1fix8\n')
+                self.assertEqual((self.target / '.mono-calendar-version').read_text(), 'C509.p2-rp1-1.0.0\n')
                 for module in ('mlan8897', 'sd8897'):
                     self.assertEqual((self.target / (module + '.ko')).read_bytes(),
                                      (self.bundle / 'patched' / (module + '.ko')).read_bytes())

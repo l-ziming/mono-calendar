@@ -4,7 +4,7 @@
 
 ## 安装 HA App
 
-1. 在 HA 应用商店右上角菜单选择「仓库」，添加本仓库的 GitHub 地址。手动安装可以通过 Samba 或 Terminal & SSH，把 `ha-app/` 的全部文件复制到 `/local_apps/mono_calendar/`（旧共享目录可能叫 `addons`）。
+1. 在 HA 应用商店右上角菜单选择「仓库」，添加本仓库的 GitHub 地址。手动安装可以通过 Samba 或 Terminal & SSH，把源码的 `ha-app/`（发布包内为 `ha/`）全部文件复制到 `/local_apps/mono_calendar/`，包括隐藏文件。旧共享目录可能叫 `addons`。
 2. 刷新应用商店，安装「刻历」。镜像为 `node:24-bookworm-slim`，支持 amd64 和 aarch64。
 3. 在 App 配置页设置独立的 `display_token`，至少 24 字符。填写时区、天气、传感器和设备，用不到的实体留空。
 4. 把 [便条实体模板](https://github.com/l-ziming/mono-calendar/blob/main/deploy/home-assistant/mono-calendar-assistant.yaml) 加到 HA packages，创建最大长度为 255 的 `input_text.mono_calendar_assistant`。
