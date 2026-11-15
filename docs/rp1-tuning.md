@@ -1,69 +1,56 @@
 # RP1 系统调优
 
-RP1 待机时经常被网络检查和无线流量叫醒，所以在自己的设备上做了一些调整。固件版本是 `1.6.50.14130`，内核和 Wi-Fi 固件镜像用的还是原版。设备上的命令通过 root ADB 执行。
+这台 DPT-RP1 的固件是 `1.6.50.14130`，内核和 Wi-Fi 固件镜像仍用原版。为减少待机唤醒，调整了 Wi-Fi 驱动、Sony 网络检查和自动发现。排查已结束，设备保留这些日常设置，额外诊断已关闭。
 
-| 项目 | 原来的设置 | 现在的设置 |
-| --- | --- | --- |
-| 广播过滤与 ARP 应答 | `ipaddr 0`，ARP 由主机处理 | `ipaddr 3;<RP1 的 IPv4>`，过滤广播并代答本机 ARP |
-| Sony 网络检查 | 每 20 秒一次 | 每 5 分钟一次，之前试过 60 秒 |
-| Sony 自动发现 | `DPDiscoveryService` / `mdnsd` 运行 | 注销后停用 |
-| Wi-Fi 驱动 | `C509` | `C509.p2-rp1fix1`，安装到原厂加载器优先读取的 `/system/lib/modules` |
-| IPv6 | 启用 | `all/default.disable_ipv6=1`，退出 IPv6 地址与组播 MAC 订阅，保留 IPv4 同步；重启后重新设置 |
-| 内核诊断日志 | 过滤级别 6、`initcall_debug=N` | 过滤级别 7、`initcall_debug=N`；驱动 `diagnostic=Y`、RESET 抓栈开启，保留超时日志和故障栈 |
-| 刻历整刻闹钟 | `setExact` 被 Sony 扩窗数分钟 | `setWindow(..., 1000, ...)`，实机窗口 1 秒 |
+## 当前设置
 
-## 无关广播过滤的范围
+| 项目 | 设置 |
+| --- | --- |
+| Wi-Fi 驱动 | `C509.p2-rp1fix8`，成对安装到 `/system/lib/modules` |
+| 休眠过滤 | 默认开启白名单与本机 ARP 代答，仅在固件 host sleep 时生效；清醒时正常收包 |
+| Sony 网络检查 | `persist.sys.netsaver.interval=300000`，从原来的 20 秒改为 5 分钟 |
+| Sony 自动发现 | `DPDiscoveryService` 已注销并禁用，`mdnsd` 已停止 |
+| 刻历同步 | 按屏幕时区，06:00–24:00 每 15 分钟一次，00:00–06:00 每小时一次；闹钟窗口为 1 秒 |
 
-驱动下发的规则放行**针对 RP1 自身 IPv4 的广播 ARP、全部二层单播和组播**，过滤查询其他 IP 的 ARP、路由器 Mesh 和 UDP 等其他广播。过滤在固件休眠路径生效，主机清醒时仍能抓到这些包。
+驱动由原厂加载器优先读取，Wi-Fi 重开和设备重启后保留，原厂 `/lib/modules` 不变。规则随当前 IPv4、MAC 和模块重载重新准备。规则内容、开关、安装与回退见 [Wi-Fi 驱动说明](../misc/rp1-wifi/README.md)。
 
-`ipaddr` 中的 `3 = 1（过滤）+ 2（自动 ARP 应答）`，不改变 Android/DHCP 的地址分配。Android `iptables` 处理报文时 CPU 已经醒了，所以过滤放在 Wi-Fi 固件里做。
+网络检查参数和发现组件的禁用也会保留。5 分钟检查让断网时的备用检查更慢，Wi-Fi 自身自动重连和刻历同步仍正常。停用发现会影响电脑、手机自动发现 RP1；刻历直接访问配置的服务器，不依赖 mDNS。其他应用仍可能按需启动 `mdnsd`。
 
-mDNS、MLD、IGMP 仍可能叫醒 RP1，部分 IPv4 组播也会被网络侧以单播 MAC 投递。因此还单独停用了 mDNS，退出不需要的订阅。
+IPv6 当前为 `all/default.disable_ipv6=1`、`wlan0.disable_ipv6=0`。这些是运行时状态，不由驱动补丁管理，也没有额外的开机恢复任务。
 
-## 持久性与功能影响
+## 休眠过滤的范围
 
-- **驱动补丁会保留。** Wi-Fi 重开和设备重启后都会从 `/system/lib/modules` 加载成对的补丁模块，原厂 `/lib/modules` 不变。原版备份、补丁和安装、回退步骤放在 [misc/rp1-wifi](../misc/rp1-wifi/README.md)。
-- **广播过滤和 ARP 代答是临时设置。** 先用 `ip -4 addr show dev wlan0` 查地址，再设置 `mlanutl wlan0 ipaddr "3;当前IPv4"`。IPv4 地址变了要更新；Wi-Fi 关闭再开启会清空配置，重启或驱动重载后也要核对。这个命令会重建 MEF 表，已有自定义规则时要先确认，避免覆盖。
-- **网络检查间隔会保留。** 参数是 `persist.sys.netsaver.interval=300000`，需要正常重新启用 Wi-Fi 或重启才会加载。原任务即使联网正常也会唤醒设备并持锁约 1 秒。改成 5 分钟后，断线时这条备用扫描路径比之前的 60 秒最多多等约 4 分钟，正常的 Wi-Fi 自动重连仍然工作。刻历每 15 分钟的同步闹钟独立运行。
-- **Sony 发现组件的禁用会保留。** 电脑、手机自动发现 RP1 会受影响，Wi-Fi、普通 DNS 和 IPv6 邻居发现不受这一步影响。刻历直接访问配置好的服务器，不依赖 mDNS。
+2026-11-14 23:26 至 11-15 00:17（America/Denver）的拔线记录中，临时白名单连续生效了 **51 分 19 秒**。该轮在 `fix7` 上手动下表，与 `fix8` 在当时地址下生成的 7 条、356 字节规则完全一致。期间 **Wi-Fi 唤醒为 0**，16 次实际恢复包括 15 次 PMIC、1 次 RTC，没有新增恢复失败；23:30、23:45、00:00 三次自然同步均成功。临时试验到期后自动恢复了旧过滤，之后的待机时间不算白名单测试。
 
-直接杀进程可能留下失效注册，要正常停止服务并等 NSD 注册清空。
+固件休眠实验在 USB 连接下确认了匹配顺序和 ARP 代答。安装 `fix8` 后，独立重载 Wi-Fi 能自动重新准备白名单；本机流量和 DHCP 可以通过，无关广播在休眠时丢弃、清醒时可接收。真实 DHCP 续租抓到了匹配的 REQUEST／ACK，11 月 15 日 15:45 的原有闹钟也正常完成了同步。电池收益尚未量化。
 
-```sh
-adb shell 'am stopservice -n com.sony.infras.networkmanager/.services.DPDiscoveryService'
-adb shell 'dumpsys servicediscovery'  # 确认活动注册清空
-adb shell 'ndc mdns mdnssd stop-service'
-adb shell 'pm disable com.sony.infras.networkmanager/.services.DPDiscoveryService'
-```
+## 诊断收尾
 
-本机旧版 `ndc` 命令里的第一个 `mdns` 用来选择控制 socket，不能省略。其他应用仍可能按需启动 mDNS。停用后，两个 mDNS 组播成员退出，Wi-Fi 和定时同步正常。
+当前驱动诊断为 `diagnostic=N`，内核日志恢复为原来的过滤级别 `6`、`initcall_debug=N`。我们额外加载的 `rp1_reset_stack` 抓栈模块已卸载，同步观察器和临时抓包任务已停止。Sony 原生系统日志和持久日志保留。
 
-## 已确认的唤醒来源
-
-- **GPIO39：Wi-Fi。** 18 次样本的同期首包包括 10 次 IPv6 mDNS、3 次 MLD 查询、4 次 IGMP，另外 1 次没有归类，与固件报告的原因对得上。
-- **PMIC：RTC/系统闹钟。** 停用发现前观察了 39 分 47 秒，25 次唤醒都对应 Sony 的 60 秒检查。
-- **GPIO76：触控。** 回插前观察到用户操作带来的唤醒。刻历的整刻任务可能合并到已有系统唤醒中，计数时要去重。
-
-原始配置、广播过滤、过滤/ARP 代答加 60 秒检查，三轮总唤醒率分别是 **11.65、6.78、4.25 次/分钟**。网络流量、观察时段和 HA 扫描状态不同，这组数字不代表每项改动的独立收益，也不能换算成省电百分比。
+RP1 上的 370 个旧诊断文件、约 280 MB，已逐文件校验并归档到本机私有目录 `.local/diagnostics/rp1-cleanup-20261115/`，随后从设备清理。当前驱动、安装回退包和原厂备份保留。旧的 `.local/rp1-system/restore.sh` 已停用，避免再次开启诊断；日常使用无需运行恢复脚本。
 
 ## 恢复方法
 
-同时连接多台设备时，给 `adb` 加 `-s 序列号`。
+设备命令通过 root ADB 执行；连接多台设备时，给 `adb` 加 `-s 序列号`。
+
+恢复 Sony 默认网络检查间隔：
 
 ```sh
-# 移除广播过滤/ARP 代答；恢复 Sony 默认 20 秒参数。
-adb shell 'mlanutl wlan0 ipaddr "0"'
 adb shell 'setprop persist.sys.netsaver.interval ""'
+```
 
-# 恢复 Sony 发现：先启动 daemon，确认 running，再重建注册。
+正常重新启用 Wi-Fi 或重启后生效，期间会短暂断网。日志中的 `Set Condition Save Event [20000]` 表示已加载默认的 20 秒间隔。
+
+恢复 Sony 自动发现：
+
+```sh
 adb shell 'pm enable com.sony.infras.networkmanager/.services.DPDiscoveryService'
 adb shell 'ndc mdns mdnssd start-service'
 adb shell 'getprop init.svc.mdnsd'
-# 确认为 running 后：
+# 确认为 running 后重建注册：
 adb shell 'am startservice -n com.sony.infras.networkmanager/.services.DPDiscoveryService'
-
-# 恢复原来的内核诊断级别。
-adb shell 'echo N > /sys/module/kernel/parameters/initcall_debug; echo 6 > /sys/kernel/debug/log_ctrl_filter_kernel'
+adb shell 'dumpsys servicediscovery'
 ```
 
-恢复 20 秒参数后，正常重新启用 Wi-Fi 或重启，检查日志里是否出现 `Set Condition Save Event [20000]`，期间会短暂断网。恢复发现服务后，还要查看 NSD 注册和 mDNS 组播成员是否回来，只有进程启动并不代表注册恢复了。
+本机旧版 `ndc` 命令里的第一个 `mdns` 用来选择控制 socket，不能省略。恢复后检查 NSD 注册和 mDNS 组播成员是否回来，只有进程启动还不够。

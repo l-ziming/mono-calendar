@@ -50,6 +50,7 @@
 #define ACCESS_ONCE(x) (*(volatile __typeof__(x) *)&(x))
 typedef uint32_t t_u32;
 typedef uint8_t t_u8;
+typedef uint16_t t_u16;
 typedef uintptr_t t_ptr;
 typedef void t_void;
 typedef int mlan_status;
@@ -147,11 +148,13 @@ static moal_private *woal_get_priv(moal_handle *h,int role) { return h->priv_num
 static void woal_inform_bss_from_scan_result(moal_private *p,void *unused,int opt) { (void)p;(void)unused;(void)opt; }
 static void cfg80211_sched_scan_results(struct wiphy *p) { (void)p; }
 static void cfg80211_report_wowlan_wakeup(struct wireless_dev *d,struct cfg80211_wowlan_wakeup *r,int gfp) { assert(d && r); (void)gfp; report_count++; }
+static unsigned counted_wakes, counted_reason;
+static void rp1_count_wake(t_u16 reason) { counted_wakes++; counted_reason=reason; }
 #include "generated/woal_cfg80211_resume.h"
 static void fresh(void) {
  assert(live_count==0); memset(&handle,0,sizeof(handle)); memset(&priv,0,sizeof(priv)); memset(&phy,0,sizeof(phy)); memset(&wdev,0,sizeof(wdev)); memset(&wowlan,0,sizeof(wowlan));
  handle.priv_num=1; handle.priv[0]=&priv; handle.cfg80211_suspend=true; priv.phandle=&handle; priv.wdev=&wdev; wdev.wiphy=&phy; phy.priv=&handle; phy.wowlan_config=&wowlan;
- diagnostic=false; diagnostic_text[0]=0; diagnostic_logs=factory_logs=wake_all=wake_interruptible=alloc_count=free_count=report_count=processed_response=0; jiffies=123; active_req=NULL; request_status=10; completion_status=MLAN_STATUS_SUCCESS; response_reason=UCAST_DATA_MATCHED; mode=COMPLETE_IN_WAIT; unlock_action=NO_ACTION; alloc_fail=false;
+ diagnostic=false; diagnostic_text[0]=0; diagnostic_logs=factory_logs=wake_all=wake_interruptible=alloc_count=free_count=report_count=counted_wakes=processed_response=0; jiffies=123; active_req=NULL; request_status=10; completion_status=MLAN_STATUS_SUCCESS; response_reason=UCAST_DATA_MATCHED; mode=COMPLETE_IN_WAIT; unlock_action=NO_ACTION; alloc_fail=false;
 }
 static mlan_ioctl_req *new_waiter(t_u8 option) { mlan_ioctl_req *r=woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_pm_cfg)); r->req_id=MLAN_IOCTL_PM_CFG; ((mlan_ds_pm_cfg *)r->pbuf)->sub_command=MLAN_OID_PM_HS_WAKEUP_REASON; r->action=MLAN_ACT_GET; handle.ioctl_pending=1; woal_fill_wait_queue(&priv,(wait_queue *)r->reserved_1,option); return r; }
 int main(void) {
@@ -166,11 +169,11 @@ int main(void) {
  fresh(); diagnostic=true; r=new_waiter(MOAL_IOCTL_WAIT); unlock_action=OWNER_FREE;
  assert(moal_ioctl_complete(&handle,r,MLAN_STATUS_SUCCESS)==MLAN_STATUS_SUCCESS); assert(free_count==1 && live_count==0 && strstr(diagnostic_text,"attached=1")); puts("PASS owner frees immediately after completion unlock, before completion log (ASan)");
  int failures[]={MLAN_STATUS_FAILURE,MLAN_STATUS_RESOURCE};
- for(unsigned i=0;i<sizeof(failures)/sizeof(*failures);i++) { fresh(); request_status=failures[i]; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && free_count==1); assert(diagnostic_logs==0); }
- fresh(); alloc_fail=true; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && alloc_count==0); puts("PASS resume immediate failures/ENOMEM clear suspended and do not report");
- fresh(); mode=TIMEOUT_ONLY; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && free_count==0); moal_ioctl_complete(&handle,active_req,MLAN_STATUS_FAILURE); active_req=NULL; assert(free_count==1); puts("PASS resume PENDING timeout clears suspended without report or premature free");
- fresh(); handle.priv_num=0; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && alloc_count==0 && report_count==0); puts("PASS missing STA leaves suspend state clean");
- fresh(); assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==1 && free_count==1 && diagnostic_logs==0); assert(factory_logs>0); puts("PASS successful resume still reports; diagnostic off emits no custom logs");
+ for(unsigned i=0;i<sizeof(failures)/sizeof(*failures);i++) { fresh(); request_status=failures[i]; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && counted_wakes==0 && free_count==1); assert(diagnostic_logs==0); }
+ fresh(); alloc_fail=true; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && counted_wakes==0 && alloc_count==0); puts("PASS resume immediate failures/ENOMEM clear suspended and do not report");
+ fresh(); mode=TIMEOUT_ONLY; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==0 && counted_wakes==0 && free_count==0); moal_ioctl_complete(&handle,active_req,MLAN_STATUS_FAILURE); active_req=NULL; assert(free_count==1); puts("PASS resume PENDING timeout clears suspended without report or premature free");
+ fresh(); handle.priv_num=0; assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && alloc_count==0 && report_count==0 && counted_wakes==0); puts("PASS missing STA leaves suspend state clean");
+ fresh(); assert(woal_cfg80211_resume(&phy)==0); assert(!handle.cfg80211_suspend && report_count==1 && counted_wakes==1 && counted_reason==UCAST_DATA_MATCHED && free_count==1 && diagnostic_logs==0); assert(factory_logs>0); puts("PASS successful resume still reports; diagnostic off emits no custom logs");
  fresh(); diagnostic=true; assert(woal_cfg80211_resume(&phy)==0); assert(diagnostic_logs>0 && strstr(diagnostic_text,"WAKE_QUERY_BEGIN") && strstr(diagnostic_text,"RESUME_DONE")); puts("PASS diagnostic on emits the actual macro's query/wait/completion markers");
  assert(live_count==0); puts("All extracted-source checks passed (host simulation, not kernel/device validation)."); return 0;
 }

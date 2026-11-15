@@ -4650,6 +4650,7 @@ woal_cfg80211_resume(struct wiphy *wiphy)
 			 query_status);
 		goto resume_done;
 	}
+	rp1_count_wake(wakeup_reason.hs_wakeup_reason);
 
 #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 11, 0) && defined(CONFIG_PM)
 	memset(&wakeup_report, 0, sizeof(struct cfg80211_wowlan_wakeup));

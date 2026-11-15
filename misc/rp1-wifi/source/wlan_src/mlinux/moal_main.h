@@ -1699,9 +1699,12 @@ struct _moal_handle {
 	/* feature_control */
 	t_u8 feature_control;
 	struct notifier_block woal_notifier;
+	struct rp1_filter_state *rp1_filter;
 	struct net_device napi_dev;
 	struct napi_struct napi_rx;
 };
+void woal_rp1_filter_event(moal_handle *handle, bool rebuild);
+void rp1_count_wake(t_u16 reason);
 /**
  *  @brief set trans_start for each TX queue.
  *

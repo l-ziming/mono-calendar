@@ -1277,6 +1277,7 @@ moal_recv_event(IN t_void *pmoal_handle, IN pmlan_event pmevent)
 				     pmevent->event_len);
 		woal_update_dscp_mapping(priv);
 		priv->media_connected = MTRUE;
+		woal_rp1_filter_event(priv->phandle, true);
 		if (!netif_carrier_ok(priv->netdev))
 			netif_carrier_on(priv->netdev);
 		woal_wake_queue(priv->netdev);
@@ -2009,6 +2010,7 @@ moal_recv_event(IN t_void *pmoal_handle, IN pmlan_event pmevent)
 #endif
 #if defined(SDIO_SUSPEND_RESUME)
 		priv->phandle->hs_activated = MFALSE;
+		woal_rp1_filter_event(priv->phandle, false);
 #endif
 		break;
 #ifdef UAP_SUPPORT

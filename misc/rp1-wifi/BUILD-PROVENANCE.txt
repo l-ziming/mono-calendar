@@ -1,45 +1,69 @@
-Local macOS ARMv7 RP1 driver build
+RP1 Wi-Fi driver build: C509.p2-rp1fix8
+Build date: 2026-11-15 (America/Denver)
 
-Toolchain: official AOSP Darwin x86_64 arm-linux-androideabi GCC 4.8,
-Android android-5.1.1_r38 tag, executed under Rosetta on this Apple Silicon Mac.
-URL: https://android.googlesource.com/platform/prebuilts/gcc/darwin-x86/arm/arm-linux-androideabi-4.8/+archive/refs/tags/android-5.1.1_r38.tar.gz
-Archive SHA256: 263e726adf803ddccf55ced75df5e3af4c50ea4a86cf570e872217d395f27daa
-Current temporary extraction: /tmp/rp1-wifi-driver-build/aosp-gcc48
-
-Rebuild after /tmp deletion:
-  ./build-driver.sh > build.log 2>&1
-The script downloads and SHA256-verifies that official toolchain into .build/aosp-gcc48 when absent, prepares headers in .build/kernel, and builds source/wlan_src. No global installation and no device access.
-
-Reuse already downloaded toolchain/headers instead:
-  RP1_TOOLCHAIN_DIR=/tmp/rp1-wifi-driver-build/aosp-gcc48 RP1_BUILD_DIR=/tmp/rp1-wifi-driver-build/kernel-build ./build-driver.sh > build.log 2>&1
-RP1_KERNEL_SOURCE may override the existing Sony source directory.
-
-Sony kernel source used:
-  ../rp1-kernel-20261110-live/source/linux-3.14.35
-Official Sony OSS page:
+Inputs
+- Driver base: Sony C509.p2, drivers/marvell/sd8897/wlan_src from the
+  DPT-RP1/DPT-CP1 1.6.02 GPL source. The device's factory modules are C509.
   https://oss.sony.net/Products/Linux/dp/DPT-RP1_DPT-CP1_Ver1.6.02.html
-The parent package linux-3.14.35.tar.gz is retained in rp1-kernel-20261110-live.
-Driver base: its drivers/marvell/sd8897/wlan_src, C509.p2.
-Stock driver: C509, extracted from the device.
+- Sony linux-3.14.35; the local default source path is documented in README.md.
+- build-support/kernel.config is the device configuration, unchanged by
+  olddefconfig. SHA256: 789211b4b1e83449491c818368664ec887f9cfce4bca134b409d56492979cf85
+- Official AOSP Darwin x86_64 arm-linux-androideabi GCC 4.8, android-5.1.1_r38,
+  executed under Rosetta on Apple Silicon.
+  https://android.googlesource.com/platform/prebuilts/gcc/darwin-x86/arm/arm-linux-androideabi-4.8/+archive/refs/tags/android-5.1.1_r38.tar.gz
+  Archive SHA256: 263e726adf803ddccf55ced75df5e3af4c50ea4a86cf570e872217d395f27daa
+- build-support/hostinclude/elf.h is the retained musl ELF header; its license
+  is in build-support/hostinclude/COPYRIGHT.musl. File hashes are in SHA256SUMS.
 
-build-support/kernel.config is copied byte-for-byte from the device config:
-SHA256 789211b4b1e83449491c818368664ec887f9cfce4bca134b409d56492979cf85
-The script requires olddefconfig to preserve it exactly.
+Rebuild
+Run build-driver.sh as described in README.md. It downloads and checks the
+compiler when absent, prepares external kernel headers, and builds the paired
+modules in source/wlan_src without modifying the Sony kernel source.
 
-Host ELF header: local retained copy of official musl include/elf.h fetched from
-https://git.musl-libc.org/cgit/musl/plain/include/elf.h
-Retained file SHA256: d62fe51eb318a17d5d6a6669172eb7ba522dad03698a9b521265af3b6b23b489
-This permits host modpost to build on macOS. Host tools use Apple clang -arch x86_64 and -Wl,-no_pie, which avoids arm64 Mach-O text relocation failures in old file2alias.c. Sony kernel source stays read-only; only external O= output and copied driver generate build files.
+The installed pair was built from the repository root with retained tools:
+  RP1_TOOLCHAIN_DIR=/private/tmp/rp1-wifi-driver-build/aosp-gcc48 RP1_BUILD_DIR=/private/tmp/rp1-wifi-driver-build/kernel-build bash misc/rp1-wifi/build-driver.sh
 
-Critical target flags:
--fno-pic -fno-pie MUST appear in the CC command itself, not only KCFLAGS.
-AOSP GCC defaults to PIC: otherwise gcc-goto.sh fails, CC_HAVE_ASM_GOTO is omitted, and struct module wrongly shrinks from 0x178 to 0x170. PIC also creates GOT relocations unsupported by this kernel loader.
-NDK clang18 is unsuitable without additional kernel header changes: local register asm("sp") used by current_thread_info is miscompiled. Do not deploy clang baseline artifacts.
+Required flags and ABI
+- -fno-pic -fno-pie must appear in CC itself, including feature probes. AOSP
+  GCC otherwise creates unsupported GOT relocations and omits CC_HAVE_ASM_GOTO,
+  shrinking struct module from the stock 0x178 bytes to 0x170.
+- Host tools use Apple clang -arch x86_64 and -Wl,-no_pie, with the retained
+  ELF header. NDK clang 18 is unsuitable for this unmodified kernel: the local
+  register asm("sp") used by current_thread_info is miscompiled.
+- Both modules are ARMv7 EABI5, version C509.p2-rp1fix8, with vermagic
+  "3.14.35 SMP preempt mod_unload ARMv7 " and a 0x178 module structure.
+- MLAN retains all 14 factory exports and 5 imports. The 252 sd8897 imports
+  resolve against the paired module and 7416 cached device exports. No GOT
+  relocations remain. CONFIG_MODVERSIONS=n; a full-kernel Module.symvers is
+  not required for this build.
+- The external sd8897 depends on mlan8897; the stock pair uses the older
+  mlan8777 dependency name. Install and unload the matching pair together.
+- patched/ contains the exact unstripped build outputs. SHA256SUMS records
+  these modules, the source, installer, cumulative patch and test fixture.
+  resume-fix.patch is regenerated against pristine C509.p2.
 
-Baseline static checks:
-Both vermagic: 3.14.35 SMP preempt mod_unload ARMv7
-Both .gnu.linkonce.this_module: 0x178 (stock matches)
-14 MLAN exports, kernel imports, and 61 stock parameters match.
-Stock sd8897 depends=mlan8777; external pair depends=mlan8897. Use actual /proc/modules names when unloading and load the new matching pair together.
-Missing full-kernel Module.symvers is expected with CONFIG_MODVERSIONS=n; static imports were separately checked against stock and device __ksymtab.
-No device operations are performed by the script.
+Whitelist and validation
+The seven mode-1 entries total 356 bytes and match the physically tested
+whitelist-reference.entries.bin byte for byte for its recorded IPv4/MAC.
+Reference SHA256: 602c9c234d1b002156821b3ac3e88a552f4a545640440dd517e6d72eeff83f0e
+The worker rebuilds for address changes. Successful STA MAC changes queue the
+same asynchronous rebuild; firmware programming remains outside PM callbacks.
+The earlier broadcast-blacklist /proc interface has been removed.
+
+Host checks pass under ASan/UBSan: the actual builder, packet matching, dynamic
+IPv4/MAC, request ownership, failure cleanup and temporary negative controls.
+The installer tests cover upgrades, interruption recovery and rollback.
+
+Installed on the RP1, then independently unloaded/re-enabled Wi-Fi. Both fix8
+modules loaded from /system/lib/modules and prepared the whitelist without a
+manual MEF command. Boot and factory-module hashes were unchanged; /system
+and its block device returned to read-only.
+
+Online firmware-HS tests kept the driver-managed table enabled: own IPv4 and
+client DHCP DF0/DF1 passed; unrelated broadcasts and other-client DHCP were
+blocked in HS and received awake. Multicast had no awake delivery control and
+was not counted as a pass. Cleanup left HS inactive, the original HS cache,
+filter=Y and diagnostic=N. Real DHCP REQUEST/ACK and the existing 15:45 local
+sync also passed. These USB checks do not measure CPU deep sleep or energy.
+The separate battery test used the byte-identical temporary table; its scope
+and results are recorded in ../../docs/rp1-tuning.md.

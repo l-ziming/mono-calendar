@@ -66,4 +66,5 @@ if not match:
     raise ValueError('RP1_DIAG')
 (OUT / 'diagnostic_macro.h').write_text(match[0])
 manifest['moal_main.h'] = hashlib.sha256((SRC / 'moal_main.h').read_bytes()).hexdigest()
+manifest['moal_rp1_filter.h'] = hashlib.sha256((SRC / 'moal_rp1_filter.h').read_bytes()).hexdigest()
 (OUT / 'source_hashes.json').write_text(json.dumps(manifest, indent=2) + '\n')

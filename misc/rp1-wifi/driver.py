@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -17,7 +18,7 @@ import time
 PACKAGE = Path(__file__).resolve().parent
 PROJECT = PACKAGE.parents[1]
 REMOTE = '/data/local/tmp/mono-calendar-wifi-patch'
-VERSION = 'C509.p2-rp1fix1'
+VERSION = 'C509.p2-rp1fix8'
 MODULES = ('mlan8897', 'sd8897')
 BOOT = '/dev/block/platform/soc.2/by-name/boot'
 
@@ -27,15 +28,17 @@ def checksum(path):
         return hashlib.sha256(source.read()).hexdigest()
 
 
-def check_assets():
+def check_assets(action='install'):
     hashes = {}
     for line in (PACKAGE / 'SHA256SUMS').read_text().splitlines():
         digest, name = line.split(maxsplit=1)
-        path = (PACKAGE / name).resolve()
-        if not path.is_relative_to(PACKAGE) or checksum(path) != digest:
-            raise RuntimeError('文件校验失败：' + name)
         hashes[name] = digest
-    for module in MODULES:
+    required = hashes if action == 'install' else ('files.sh',) if action == 'rollback' else ()
+    for name in required:
+        path = (PACKAGE / name).resolve()
+        if not path.is_relative_to(PACKAGE) or checksum(path) != hashes[name]:
+            raise RuntimeError('文件校验失败：' + name)
+    for module in MODULES if action == 'install' else ():
         data = (PACKAGE / 'patched' / (module + '.ko')).read_bytes()
         if b'vermagic=3.14.35 SMP preempt mod_unload ARMv7 ' not in data:
             raise RuntimeError('模块内核版本不匹配：' + module)
@@ -132,19 +135,70 @@ class Device:
             'boot_bytes': boot_size,
             'original_modules': {name: hashes['original/' + name + '.ko'] for name in MODULES},
         }
+        if record['before']['override'] == 'present':
+            version = self.shell('cat /system/lib/modules/.mono-calendar-version')
+            if version not in (VERSION, 'C509.p2-rp1fix7', 'C509.p2-rp1fix6', 'C509.p2-rp1fix5', 'C509.p2-rp1fix4', 'C509.p2-rp1fix3', 'C509.p2-rp1fix1'):
+                raise RuntimeError('优先目录的补丁版本未知，未修改设备')
+            previous = directory / 'previous'
+            previous.mkdir(mode=0o700)
+            previous_hashes = {}
+            for module in MODULES:
+                remote = '/system/lib/modules/' + module + '.ko'
+                destination = previous / (module + '.ko')
+                with destination.open('wb') as output:
+                    result = subprocess.run(
+                        [self.adb, '-s', self.serial, 'exec-out', 'cat', remote],
+                        stdout=output, stderr=subprocess.PIPE, timeout=30,
+                    )
+                destination.chmod(0o600)
+                if result.returncode or checksum(destination) != self.remote_hash(remote):
+                    raise RuntimeError('当前稳定驱动备份未通过校验，未修改设备')
+                previous_hashes[module] = checksum(destination)
+            record['previous_override'] = {'version': version, 'hashes': previous_hashes}
         path = directory / 'backup.json'
         path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + '\n')
         path.chmod(0o600)
         return directory, boot_hash
 
-    def stage(self):
+    def restore_previous(self, directory):
+        record = json.loads((directory / 'backup.json').read_text())
+        previous = record.get('previous_override')
+        if previous is None:
+            return 'C509'
+        remote = REMOTE + '/recovery'
+        self.shell('mkdir -p ' + remote + '/original ' + remote + '/patched\nchmod 700 ' + remote)
+        for module in MODULES:
+            source = directory / 'previous' / (module + '.ko')
+            if checksum(source) != previous['hashes'][module]:
+                raise RuntimeError('上一版驱动备份校验失败')
+            self.run('push', str(source), remote + '/patched/' + module + '.ko')
+            self.run('push', str(PACKAGE / 'original' / (module + '.ko')), remote + '/original/' + module + '.ko')
+        script = (PACKAGE / 'files.sh').read_text()
+        values = {'version': previous['version'], 'patched_mlan': previous['hashes']['mlan8897'],
+                  'patched_sd': previous['hashes']['sd8897']}
+        for key, value in values.items():
+            if not re.fullmatch(r'[A-Za-z0-9.\-]+', value):
+                raise RuntimeError('上一版驱动备份元数据无效')
+            script, count = re.subn(r'^' + key + r'=.*$', key + '=' + value, script, flags=re.M)
+            if count != 1:
+                raise RuntimeError('恢复脚本字段不匹配')
+        path = directory / 'recover-files.sh'
+        path.write_text(script)
+        path.chmod(0o600)
+        self.run('push', str(path), remote + '/files.sh')
+        self.shell('sh ' + remote + '/files.sh install')
+        return previous['version']
+
+    def stage(self, action='install'):
         self.shell('mkdir -p ' + REMOTE + '/original ' + REMOTE + '/patched\nchmod 700 ' + REMOTE)
-        for folder in ('original', 'patched'):
+        for folder in ('original', 'patched') if action == 'install' else ():
             for module in MODULES:
                 name = module + '.ko'
                 self.run('push', str(PACKAGE / folder / name), REMOTE + '/' + folder + '/' + name)
         self.run('push', str(PACKAGE / 'files.sh'), REMOTE + '/files.sh')
-        self.shell('chmod 600 ' + REMOTE + '/files.sh ' + REMOTE + '/original/*.ko ' + REMOTE + '/patched/*.ko')
+        self.shell('chmod 600 ' + REMOTE + '/files.sh')
+        if action == 'install':
+            self.shell('chmod 600 ' + REMOTE + '/original/*.ko ' + REMOTE + '/patched/*.ko')
 
     def stop_wifi(self):
         self.shell('''svc wifi disable
@@ -199,7 +253,7 @@ def change(device, action, hashes):
     if before['system_block_ro'] != '1' or 'ro' not in before['system_mount'].split(','):
         raise RuntimeError('system 必须先恢复只读状态')
     print('备份已校验：' + str(directory), flush=True)
-    device.stage()
+    device.stage(action)
     # Refuse an unknown override before interrupting Wi-Fi.
     device.shell('sh ' + REMOTE + '/files.sh status')
     primary_error = None
@@ -220,12 +274,13 @@ def change(device, action, hashes):
     except BaseException as operation_error:
         primary_error = operation_error
         if action == 'install':
-            print('安装未完成，正在撤回优先目录并恢复原厂驱动。', file=sys.stderr, flush=True)
+            print('安装未完成，正在恢复更新前的驱动。', file=sys.stderr, flush=True)
         try:
             if action == 'install':
                 device.stop_wifi()
                 device.files('rollback')
-                device.start_wifi('C509')
+                previous_version = device.restore_previous(directory)
+                device.start_wifi(previous_version)
             else:
                 device.shell('svc wifi enable')
         except BaseException as recovery_error:
@@ -257,7 +312,7 @@ def main():
     parser.add_argument('action', choices=('status', 'install', 'rollback'))
     parser.add_argument('--serial', default=os.environ.get('RP1_SERIAL'))
     arguments = parser.parse_args()
-    hashes = check_assets()
+    hashes = check_assets(arguments.action)
     device = Device(arguments.serial)
     if arguments.action == 'status':
         device.preflight(hashes)

@@ -53,12 +53,12 @@ Run `bash scripts/check.sh` from the repository root with Node.js 24 and Python 
 
 GitHub Actions runs tests on pushes and pull requests. When running the workflow manually, you can also enable Android desktop rendering and download the sample images.
 
-## Work in progress
+## RP1 system changes
 
-I'm also working on the RP1's system software. There isn't a ready-to-install release yet:
+I've also made some standby changes to my RP1's system software. There isn't a ready-to-install release for other devices:
 
-1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. The [system changes](docs/rp1-tuning.md) (Chinese) have cut the observed wake-up rate by more than half.
-2. **Occasional hangs after standby**: the Wi-Fi driver can time out while checking the wake reason, leaving the screen stuck until I press RESET. I'm testing a fix for the driver's timeout and wait handling.
+1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. I extended the check interval, disabled discovery, and added a firmware whitelist that acts only during host sleep. See the [system notes](docs/rp1-tuning.md) (Chinese).
+2. **Occasional hangs after standby**: the Wi-Fi driver can time out while checking the wake reason, leaving the screen stuck until I press RESET. The patch fixes timeout notification, wait handling and failure cleanup. See the [driver source, build and rollback instructions](misc/rp1-wifi/README.md) (Chinese).
 
 ## Acknowledgments
 

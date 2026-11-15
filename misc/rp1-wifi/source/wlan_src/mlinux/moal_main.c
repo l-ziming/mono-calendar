@@ -412,6 +412,8 @@ struct semaphore AddRemoveCardSem;
  **/
 moal_handle *m_handle[MAX_MLAN_ADAPTER];
 
+#include "moal_rp1_filter.h"
+
 /** The global variable of scan beacon buffer **/
 int fixed_beacon_buffer = 0;
 /** the pointer of new fwdump fname for each dump**/
@@ -1634,6 +1636,7 @@ woal_free_moal_handle(moal_handle *handle)
 		LEAVE();
 		return;
 	}
+	rp1_filter_stop(handle);
 #if defined(STA_CFG80211) || defined(UAP_CFG80211)
 	/* Unregister wiphy device and free */
 	if (handle->wiphy) {
@@ -2621,7 +2624,8 @@ err:
 #ifdef CONFIG_PROC_FS
 		woal_proc_exit(handle);
 #endif
-	}
+	} else
+		rp1_filter_start(handle);
 	LEAVE();
 	return ret;
 }
@@ -4587,6 +4591,8 @@ woal_set_mac_address(struct net_device *dev, void *addr)
 	}
 	HEXDUMP("priv->MacAddr:", priv->current_addr, ETH_ALEN);
 	memcpy(dev->dev_addr, priv->current_addr, ETH_ALEN);
+	if (priv->bss_type == MLAN_BSS_TYPE_STA)
+		woal_rp1_filter_event(priv->phandle, true);
 done:
 	LEAVE();
 	return ret;
@@ -9202,6 +9208,7 @@ woal_remove_card(void *card)
 	}
 	if (!handle)
 		goto exit_remove;
+	rp1_filter_stop(handle);
 	handle->surprise_removed = MTRUE;
 
 	flush_workqueue(handle->workqueue);
@@ -9345,6 +9352,7 @@ woal_switch_drv_mode(moal_handle *handle, t_u32 mode)
 		status = MLAN_STATUS_FAILURE;
 		goto exit;
 	}
+	rp1_filter_stop(handle);
 
 	/* Reset all interfaces */
 	priv = woal_get_priv(handle, MLAN_BSS_ROLE_ANY);
@@ -9554,6 +9562,7 @@ woal_request_fw_reload(moal_handle *handle, t_u8 mode)
 #endif /* WIFI_DIRECT_SUPPORT && V14_FEATURE */
 
 	ENTER();
+	rp1_filter_pause(handle);
 
     /** start block IOCTL */
 	handle->driver_state = MTRUE;
@@ -9634,6 +9643,8 @@ woal_request_fw_reload(moal_handle *handle, t_u8 mode)
 		woal_start_queue(handle->priv[intf_num]->netdev);
 	}
 done:
+	if (!ret)
+		rp1_filter_start(handle);
 	LEAVE();
 	return;
 }
@@ -9657,6 +9668,7 @@ woal_init_module(void)
 		m_handle[index] = NULL;
 	/* Init mutex */
 	MOAL_INIT_SEMAPHORE(&AddRemoveCardSem);
+	rp1_filter_module_ready = true;
 
 #ifdef CONFIG_OF
 	woal_init_from_dev_tree();
@@ -9713,6 +9725,7 @@ woal_cleanup_module(void)
 		handle = m_handle[index];
 		if (!handle)
 			continue;
+		rp1_filter_stop(handle);
 		if (!handle->priv_num)
 			goto exit;
 		if (MTRUE == woal_check_driver_status(handle))

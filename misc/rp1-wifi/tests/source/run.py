@@ -68,5 +68,12 @@ with tempfile.TemporaryDirectory(prefix='rp1-wifi-host-') as tmp:
         message = 'PASS negative control detects ' + label
         print(message)
         output += message + '\n'
+sleep_result = subprocess.run([sys.executable, str(HERE / 'sleep_filter.py')],
+                              capture_output=True, text=True, env=env)
+print(sleep_result.stdout, end='')
+if sleep_result.returncode:
+    print(sleep_result.stderr, file=sys.stderr)
+    raise SystemExit(sleep_result.returncode)
+output += sleep_result.stdout
 (HERE / 'last-run.txt').write_text(output)
 print('Sanitizers: ASan + UBSan. macOS LSan unsupported; allocation accounting checks all frees.')

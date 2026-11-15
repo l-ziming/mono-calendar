@@ -2,11 +2,12 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
+import hashlib
 import io
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
@@ -16,6 +17,32 @@ SPEC.loader.exec_module(driver)
 
 
 class DriverChecks(unittest.TestCase):
+    def test_status_and_rollback_do_not_require_patch_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory).resolve()
+            files = {'files.sh': b'installer', 'original/mlan8897.ko': b'factory mlan',
+                     'original/sd8897.ko': b'factory sd', 'patched/sd8897.ko': b'patch',
+                     'source/driver.c': b'source'}
+            hashes = {name: hashlib.sha256(data).hexdigest() for name, data in files.items()}
+            (package / 'SHA256SUMS').write_text(''.join(digest + '  ' + name + '\n' for name, digest in hashes.items()))
+            (package / 'files.sh').write_bytes(files['files.sh'])
+            with patch.object(driver, 'PACKAGE', package):
+                for action in ('status', 'rollback'):
+                    self.assertEqual(driver.check_assets(action), hashes)
+                with self.assertRaises(OSError):
+                    driver.check_assets('install')
+                (package / 'files.sh').write_text('corrupted')
+                with self.assertRaisesRegex(RuntimeError, 'files.sh'):
+                    driver.check_assets('rollback')
+
+    def test_rollback_stages_only_the_installer(self):
+        device = object.__new__(driver.Device)
+        device.run = Mock()
+        device.shell = Mock()
+        device.stage('rollback')
+        device.run.assert_called_once_with('push', str(driver.PACKAGE / 'files.sh'), driver.REMOTE + '/files.sh')
+        self.assertFalse(any('*.ko' in item.args[0] for item in device.shell.call_args_list))
+
     def device(self, directory, wifi_enabled=True):
         device = Mock(spec=driver.Device)
         device.backup.return_value = (Path(directory), 'boot-before')
@@ -27,6 +54,7 @@ class DriverChecks(unittest.TestCase):
             'versions': {module: 'C509' for module in driver.MODULES},
         }
         device.start_wifi.return_value = device.status.return_value
+        device.restore_previous.return_value = 'C509'
         return device
 
     def test_failed_patch_load_stops_and_restores_stock_pair(self):
@@ -44,6 +72,19 @@ class DriverChecks(unittest.TestCase):
             ])
             device.restore_system_protection.assert_called_once_with(device.status.return_value)
             self.assertFalse((Path(directory) / 'result.json').exists())
+
+    def test_failed_upgrade_restores_previous_stable_patch(self):
+        with tempfile.TemporaryDirectory() as directory, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            device = self.device(directory)
+            device.restore_previous.return_value = 'C509.p2-rp1fix3'
+            device.start_wifi.side_effect = [RuntimeError('new patch did not load'), device.status.return_value]
+
+            with self.assertRaisesRegex(RuntimeError, 'new patch did not load'):
+                driver.change(device, 'install', {})
+
+            device.restore_previous.assert_called_once_with(Path(directory))
+            self.assertEqual(device.start_wifi.call_args_list, [call(driver.VERSION), call('C509.p2-rp1fix3')])
+            device.restore_system_protection.assert_called_once_with(device.status.return_value)
 
     def test_failed_rollback_never_reinstalls_patch(self):
         with tempfile.TemporaryDirectory() as directory, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):

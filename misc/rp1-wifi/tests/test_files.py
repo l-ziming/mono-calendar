@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
+import hashlib
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -46,7 +48,14 @@ else:
         assert " ext4 rw," in mounts.read_text() and block.read_text() == "0"
     if command == "cp" and config.get("fail_copy"):
         sys.exit(1)
-    sys.exit(subprocess.run([command, *arguments]).returncode)
+    if command == "mv" and config.get("fail_publish") and Path(arguments[0]).name == "new":
+        sys.exit(1)
+    result = subprocess.run([command, *arguments])
+    if command == "mv" and result.returncode == 0:
+        step = "publish" if Path(arguments[0]).name == "new" else "backup" if Path(arguments[1]).name == "old" else None
+        if step and config.get("interrupt_after") == step:
+            os.kill(os.getppid(), 15)
+    sys.exit(result.returncode)
 '''
 
 
@@ -72,6 +81,16 @@ class FilesTest(unittest.TestCase):
             wrapper.write_text(WRAPPER)
             wrapper.chmod(0o755)
         source = (BUNDLE / "files.sh").read_text()
+        # Model a trusted previous pair with the existing factory fixtures.
+        for key, module in [('fix1_mlan', 'mlan8897'), ('fix1_sd', 'sd8897'),
+                            ('previous_mlan', 'mlan8897'), ('previous_sd', 'sd8897'),
+                            ('fix4_mlan', 'mlan8897'), ('fix4_sd', 'sd8897'),
+                            ('fix5_mlan', 'mlan8897'), ('fix5_sd', 'sd8897'),
+                            ('fix6_mlan', 'mlan8897'), ('fix6_sd', 'sd8897'),
+                            ('fix7_mlan', 'mlan8897'), ('fix7_sd', 'sd8897')]:
+            digest = hashlib.sha256((BUNDLE / 'original' / (module + '.ko')).read_bytes()).hexdigest()
+            source, count = re.subn(r'^' + key + r'=.*$', key + '=' + digest, source, flags=re.M)
+            self.assertEqual(count, 1)
         for old, new in {
             "busybox=/system/bin/busybox": f"busybox={self.root}/busybox",
             "restorecon=/system/bin/restorecon": f"restorecon={self.root}/restorecon",
@@ -133,6 +152,50 @@ class FilesTest(unittest.TestCase):
                 self.assertFalse(any(call[0] == "mount" for call in self.calls()))
                 self.assert_restored()
                 path.write_bytes(contents)
+
+    def previous_pair(self, version='C509.p2-rp1fix3'):
+        shutil.copytree(self.bundle / 'original', self.target)
+        (self.target / '.mono-calendar-version').write_text(version + '\n')
+        return {path.name: path.read_bytes() for path in self.target.iterdir()}
+
+    def test_upgrade_replaces_the_recognized_previous_pair(self):
+        for version in ('C509.p2-rp1fix1', 'C509.p2-rp1fix3', 'C509.p2-rp1fix4', 'C509.p2-rp1fix5', 'C509.p2-rp1fix6', 'C509.p2-rp1fix7'):
+            with self.subTest(version=version):
+                self.previous_pair(version)
+                self.run_action('install')
+                self.assertEqual((self.target / '.mono-calendar-version').read_text(), 'C509.p2-rp1fix8\n')
+                for module in ('mlan8897', 'sd8897'):
+                    self.assertEqual((self.target / (module + '.ko')).read_bytes(),
+                                     (self.bundle / 'patched' / (module + '.ko')).read_bytes())
+                self.assert_restored()
+                shutil.rmtree(self.target)
+
+    def test_failed_upgrade_preserves_previous_pair(self):
+        for failure in ('fail_copy', 'fail_publish'):
+            with self.subTest(failure=failure):
+                before = self.previous_pair()
+                self.control.write_text(json.dumps({failure: True}))
+                self.run_action('install', succeeds=False)
+                self.assertEqual({path.name: path.read_bytes() for path in self.target.iterdir()}, before)
+                self.assert_restored()
+                shutil.rmtree(self.target)
+
+    def test_corrupted_previous_pair_is_not_replaced(self):
+        self.previous_pair()
+        (self.target / 'sd8897.ko').write_bytes(b'damaged previous pair')
+        self.run_action('install', succeeds=False)
+        self.assertEqual((self.target / 'sd8897.ko').read_bytes(), b'damaged previous pair')
+        self.assertFalse(any(call[0] == 'mount' for call in self.calls()))
+
+    def test_interrupted_upgrade_restores_previous_pair(self):
+        for step in ('backup', 'publish'):
+            with self.subTest(step=step):
+                before = self.previous_pair()
+                self.control.write_text(json.dumps({'interrupt_after': step}))
+                self.run_action('install', succeeds=False)
+                self.assertEqual({path.name: path.read_bytes() for path in self.target.iterdir()}, before)
+                self.assert_restored()
+                shutil.rmtree(self.target)
 
     def test_unknown_directory_and_symbolic_links_are_rejected(self):
         self.target.mkdir()
