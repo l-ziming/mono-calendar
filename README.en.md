@@ -59,11 +59,11 @@ With the Android build environment configured, run `python3 scripts/package-rele
 
 ## RP1 system changes
 
-The stock firmware checks the network every 20 seconds and leaves mDNS discovery on. Even unrelated Wi-Fi broadcasts can wake the CPU in standby. I changed the check interval to five minutes, turned off discovery, and added a Wi-Fi firmware whitelist that only applies during sleep. See the [system notes](docs/rp1-tuning.md) (Chinese).
+The stock firmware checks the network every 20 seconds and keeps mDNS running. Unrelated Wi-Fi broadcasts can also wake the CPU in standby. The checks now run every five minutes. Device discovery is off, and the Wi-Fi firmware applies a whitelist only during sleep. See the [system tuning notes (Chinese)](docs/rp1-tuning.md).
 
-With Wi-Fi connected and the calendar refreshing on schedule, my RP1 now uses about 1% of its battery per hour. That works out to **roughly four days** on a full charge.
+With Wi-Fi connected and the calendar refreshing on schedule, this RP1 uses about 1% of its battery per hour. That works out to **roughly four days** on a full charge.
 
-The Wi-Fi driver would sometimes time out while checking why the RP1 woke up. The screen would freeze until I pressed RESET. I patched how the driver handles those timeouts. The source and instructions are in the [driver notes](misc/rp1-wifi/README.md) (Chinese).
+The stock Wi-Fi driver could wait indefinitely for the wake reason and freeze the RP1. The patch limits that wait and cleans up after errors. Source, build steps, and rollback instructions are in the [driver notes (Chinese)](misc/rp1-wifi/README.md).
 
 ## Acknowledgments
 
