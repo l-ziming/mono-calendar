@@ -61,8 +61,10 @@ With the Android build environment configured, run `python3 scripts/package-rele
 
 I've also made some standby changes to my RP1's system software:
 
-1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. I extended the check interval, disabled discovery, and added a firmware whitelist that acts only during host sleep. See the [system notes](docs/rp1-tuning.md) (Chinese).
+1. **Too many wake-ups in standby**: the stock firmware checks the network every 20 seconds, keeps mDNS discovery running, and lets through Wi-Fi broadcasts meant for other devices. The CPU keeps waking up, which hurts battery life. I extended the check interval to five minutes, disabled discovery, and added a firmware whitelist that acts only during host sleep. See the [system notes](docs/rp1-tuning.md) (Chinese).
 2. **Occasional hangs after standby**: the Wi-Fi driver can time out while checking the wake reason, leaving the screen stuck until I press RESET. The patch fixes timeout notification, wait handling and failure cleanup. See the [driver source, build and rollback instructions](misc/rp1-wifi/README.md) (Chinese).
+
+With these changes, I estimate **about four days** on a full charge for my RP1 with Wi-Fi connected and scheduled calendar refreshes. Sony rates the DPT-RP1 for **up to one week** with Wi-Fi on and **up to three weeks** with it off, based on daily PDF reading and annotation, Bluetooth off, and sleep between sessions. See [Sony's specifications](https://helpguide.sony.net/dpt/rp1/v1/en/contents/TP0001178339.html).
 
 ## Acknowledgments
 
